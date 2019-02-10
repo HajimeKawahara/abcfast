@@ -12,21 +12,61 @@ def gabcrm_module ():
 
     #include <stdio.h>
     #include <curand_kernel.h>
+    #define MAXTRY 100000
+
+    __device__ int model(int n,float p,curandState *s){
+    /* Binomial model generator */
+
+    int val=0;
+
+    for (int i = 0; i < n; i++){
+    if (curand_uniform(s) <= p){
+    val++;
+    }
+    }
+
+    return val;
+
+    }
+
 
     extern "C"{
-    __global__ void abcrm(float *x){
+    __global__ void abcrm(float *x, int Yobs, int n){
 
     unsigned long seed;
     unsigned long id;
     curandState s;
-    
+    int X;
+    int cnt = 0;
+    float p;
+
     seed=10;
     id = blockIdx.x;
     curand_init(seed, id, 0, &s);
 
-    x[id] = curand_uniform(&s);
+    for ( ; ; ){
+
+    /* limitter */
+    cnt++;
+    if(cnt > MAXTRY){
+    printf("EXCEED MAXTRY \\n");
+    x[id] = 0.0;
+    return;
+    }
+
+    /* sample p from the uniform distribution */
+    p = curand_uniform(&s);
+    X = model(n,p,&s);
+    if(X == Yobs){
+    x[id] = p;
+    return;
+    }
 
     }
+
+
+    }
+
     }
 
     """,options=['-use_fast_math'],no_extern_c=True)
@@ -36,13 +76,20 @@ def gabcrm_module ():
 if __name__ == "__main__":
     import numpy as np
     import matplotlib.pyplot as plt
+    from numpy import random
     
     print("*******************************************")
     print("GPU ABC Rejection Method.")
+    print("This code demonstrates a binomial example in Section 4 in Turner and Van Zandt (2012) JMP 56, 69")
     print("*******************************************")
+    n=1000
+    ptrue=0.7
+    Yobs=random.binomial(n,ptrue)
 
+    print("Observed Value is ",Yobs)
+    
     nw=1
-    nt=16
+    nt=10000
     nq=1
     nb = nw*nt*nq 
     sharedsize=0 #byte
@@ -50,11 +97,15 @@ if __name__ == "__main__":
     x=x.astype(np.float32)
     dev_x = cuda.mem_alloc(x.nbytes)
     cuda.memcpy_htod(dev_x,x)
-
+    
     source_module=gabcrm_module()
     pkernel=source_module.get_function("abcrm")
-    pkernel(dev_x,block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
+    pkernel(dev_x,np.int32(Yobs),np.int32(n),block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
     cuda.memcpy_dtoh(x, dev_x)
 
 
-    print(x)
+    plt.hist(x,bins=30,label="n="+str(n))
+    plt.axvline(ptrue,color="red",label="True")
+    plt.legend()
+    plt.xlim(0,1)
+    plt.show()
