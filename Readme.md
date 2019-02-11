@@ -2,6 +2,17 @@ GPU Approximate Baysian Computation
 
 Under development.
 
+# setting
+
+gabc uses header files for nvcc. set CPLUS_INCLUDE_PATH to gabc/include.
+
+```
+ setenv CPLUS_INCLUDE_PATH /../../exoabc/include
+
+```
+
+
+
 # ABC samples
 
 ## ABC rejection sampling

@@ -12,26 +12,17 @@ def gabcrm_module ():
 
     #include <stdio.h>
     #include <curand_kernel.h>
+    #include "genbinomial.h"
     #define MAXTRY 100000
+    
+    __device__ int rho(int X,int Y){
 
-    __device__ int model(int n,float p,curandState *s){
-    /* Binomial model generator */
-
-    int val=0;
-
-    for (int i = 0; i < n; i++){
-    if (curand_uniform(s) <= p){
-    val++;
-    }
-    }
-
-    return val;
+    return abs(X - Y);
 
     }
-
 
     extern "C"{
-    __global__ void abcrm(float *x, int Yobs, int n){
+    __global__ void abcrm(float *x, int Yobs, int n, int epsilon){
 
     unsigned long seed;
     unsigned long id;
@@ -56,8 +47,11 @@ def gabcrm_module ():
 
     /* sample p from the uniform distribution */
     p = curand_uniform(&s);
-    X = model(n,p,&s);
-    if(X == Yobs){
+
+    /* sampler */
+    X = binomialf(n,p,&s);
+
+    if(rho(X,Yobs)<epsilon){
     x[id] = p;
     return;
     }
@@ -89,7 +83,7 @@ if __name__ == "__main__":
     n=10
     ptrue=0.7
     Yobs=random.binomial(n,ptrue)
-
+    epsilon = 1
     print("Observed Value is ",Yobs)
     
     nw=1
@@ -104,15 +98,14 @@ if __name__ == "__main__":
     
     source_module=gabcrm_module()
     pkernel=source_module.get_function("abcrm")
-    pkernel(dev_x,np.int32(Yobs),np.int32(n),block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
+    pkernel(dev_x,np.int32(Yobs),np.int32(n),np.int32(epsilon),block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
     cuda.memcpy_dtoh(x, dev_x)
 
     tend=time.time()
     print("t=",tend-tstart)
     
-    plt.hist(x,bins=30,label="n="+str(n),normed=True,alpha=0.5)
+    plt.hist(x,bins=30,label="n="+str(n),density=True,alpha=0.5)
     plt.axvline(ptrue,color="gray",label="True",ls="dashed")
-    plt.legend()
     plt.xlim(0,1)
     plt.xlabel("p")
     alpha=1.0
@@ -120,6 +113,7 @@ if __name__ == "__main__":
     
     xl = np.linspace(betafunc.ppf(0.0001, Yobs+alpha, n - Yobs + beta),betafunc.ppf(0.9999,Yobs+alpha, n - Yobs + beta), 100)
     plt.plot(xl, betafunc.pdf(xl, Yobs+alpha, n - Yobs + beta),label="analytic", color="green")
+    plt.legend()
 
     plt.savefig("abcrm"+str(n)+".png")
     plt.show()

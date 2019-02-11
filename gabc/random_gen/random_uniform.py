@@ -13,7 +13,7 @@ def gabcrm_module ():
     #include <curand_kernel.h>
 
     extern "C"{
-    __global__ void abcrm(float *x){
+    __global__ void uniformgen(float *x){
 
     unsigned long seed;
     unsigned long id;
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     cuda.memcpy_htod(dev_x,x)
 
     source_module=gabcrm_module()
-    pkernel=source_module.get_function("abcrm")
+    pkernel=source_module.get_function("uniformgen")
     pkernel(dev_x,block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
     cuda.memcpy_dtoh(x, dev_x)
 

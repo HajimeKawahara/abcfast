@@ -15,7 +15,7 @@ def gabcrm_module ():
 
     extern "C"{
 
-    __global__ void gammagen(float *x, float ain){
+    __global__ void gammagen(float *x, float ain, float bin){
 
     unsigned long seed;
     unsigned long id;
@@ -53,10 +53,10 @@ def gabcrm_module ():
     if (u < 1. - 0.0331 * (y * y) * (y * y)) {
 
     if(a > ain){
-    x[id] = (d * v)*pow(curand_uniform(&s),1.0/ain);
+    x[id] = (d * v)*pow(curand_uniform(&s),1.0/ain)/bin;
     return;
     }else{
-    x[id] = (d * v);
+    x[id] = (d * v)/bin;
     return;
     }
 
@@ -64,10 +64,10 @@ def gabcrm_module ():
     if (log(u) < 0.5 * y * y + d * (1. - v + log(v))) {
 
     if(a > ain){
-    x[id] = (d * v)*pow(curand_uniform(&s),1.0/ain);
+    x[id] = (d * v)*pow(curand_uniform(&s),1.0/ain)/bin;
     return;
     }else{
-    x[id] = (d * v);
+    x[id] = (d * v)/bin;
     return;
     }
 
@@ -91,10 +91,11 @@ if __name__ == "__main__":
     print("********************************************")
     print("Gamma function Random Sampler using curand_kernel.h")
     print("by Marsaglia and Tsang’s method")
-    print(":Gamma[alpha] for alpha > 0")
+    print(":Gamma[alpha,beta] for alpha > 0, beta >0")
     print("********************************************")
 
-    alpha=1.2
+    alpha=0.8
+    beta=0.8
     
     nw=1
     nt=100000
@@ -108,12 +109,12 @@ if __name__ == "__main__":
 
     source_module=gabcrm_module()
     pkernel=source_module.get_function("gammagen")
-    pkernel(dev_x,np.float32(alpha),block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
+    pkernel(dev_x,np.float32(alpha),np.float32(beta),block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
     cuda.memcpy_dtoh(x, dev_x)
 
-    plt.hist(x,bins=100,normed=True)
+    plt.hist(x,bins=100,density=True)
 
-    xl = np.linspace(gammafunc.ppf(0.01, alpha),gammafunc.ppf(0.99, alpha), 100)
-    plt.plot(xl, gammafunc.pdf(xl, alpha))
-
+    xl = np.linspace(gammafunc.ppf(0.01, alpha,scale=1.0/beta),gammafunc.ppf(0.99, alpha,scale=1.0/beta), 100)
+    plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta))
+    plt.title("Gamma Distribution, alpha="+str(alpha)+" beta="+str(beta))
     plt.show()
