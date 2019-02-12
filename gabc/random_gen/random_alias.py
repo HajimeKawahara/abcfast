@@ -42,16 +42,7 @@ def gabcrm_module ():
 
     return source_module
 
-if __name__ == "__main__":
-    import numpy as np
-    import matplotlib.pyplot as plt
-    
-    print("***********************************************")
-    print("Discrete Number Random Sampler (alias method) ")
-    print("***********************************************")
-
-    ################################################3
-    parrs=[1,2,3,4,5,6,7]
+def alias_init(parrs):
     parr=np.array(parrs, np.float32)
     parr = parr/np.sum(parr)
 
@@ -74,19 +65,6 @@ if __name__ == "__main__":
     for i in range(ir, len(parrs)):
         Ki[i] = 0
 
-    ################################################3
-    
-    nw=1
-    nt=100000
-    nq=1
-    nb = nw*nt*nq 
-    sharedsize=0 #byte
-
-    x=np.zeros(nb)
-    x=x.astype(np.int32)
-    dev_x = cuda.mem_alloc(x.nbytes)
-    cuda.memcpy_htod(dev_x,x)
-
     Ki=Ki.astype(np.int32)
     dev_Ki = cuda.mem_alloc(Ki.nbytes)
     cuda.memcpy_htod(dev_Ki,Ki)
@@ -98,13 +76,40 @@ if __name__ == "__main__":
     Ui=Ui.astype(np.float32)
     dev_Ui = cuda.mem_alloc(Ui.nbytes)
     cuda.memcpy_htod(dev_Ui,Ui)
+
+
+    return dev_Ki,dev_Li,dev_Ui
+
+if __name__ == "__main__":
+    import numpy as np
+    import matplotlib.pyplot as plt
     
+    print("***********************************************")
+    print("Discrete Number Random Sampler (alias method) ")
+    print("***********************************************")
+
+    ################################################3
+    parrs=[1,2,3,4,5,6,7]
+    dev_Ki,dev_Li,dev_Ui=alias_init(parrs)
+    
+    nw=1
+    nt=10000
+    nq=1
+    nb = nw*nt*nq 
+    sharedsize=0 #byte
+
+    x=np.zeros(nb)
+    x=x.astype(np.int32)
+    dev_x = cuda.mem_alloc(x.nbytes)
+    cuda.memcpy_htod(dev_x,x)
+
     source_module=gabcrm_module()
     pkernel=source_module.get_function("aliasgen")
     pkernel(dev_x,dev_Ki,dev_Li,dev_Ui,np.int32(len(parrs)),block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
     cuda.memcpy_dtoh(x, dev_x)
 
     plt.hist(x,bins=100)
-    plt.plot(range(0,len(parrs)),np.array(parrs)*len(x)/np.sum(parrs),"*")
+    plt.plot(range(0,len(parrs)),np.array(parrs)*len(x)/np.sum(parrs),"*",label="$p_i$")
+    plt.legend()
     plt.xticks(range(0,len(parrs)))
     plt.show()
