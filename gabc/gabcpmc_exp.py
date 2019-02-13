@@ -395,6 +395,7 @@ if __name__ == "__main__":
 
     #pmc sequence
     for j,epsilon in enumerate(epsilon_list[1:]):
+        tstartx=time.time()
         print(j,epsilon)
         seed = seed_list[j+1]
         sigmat_prev = np.sqrt(2.0*np.var(x))
@@ -415,7 +416,7 @@ if __name__ == "__main__":
             sys.exit("")
         
         tend=time.time()
-        print("t=",tend-tstart)
+        print("t=",tend-tstartx)
         plt.hist(x,bins=10,label="$\epsilon$="+str(epsilon),density=True,alpha=0.3)
         
         #update weight
@@ -438,7 +439,10 @@ if __name__ == "__main__":
 
         dev_x, dev_xx = dev_xx, dev_x
         dev_w, dev_ww = dev_ww, dev_w
-        
+
+
+    print("total=",tend-tstartx)
+
     plt.legend()    
     plt.savefig("pmc_exp.png")
     plt.show()
