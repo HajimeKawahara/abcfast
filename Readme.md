@@ -32,15 +32,16 @@ ABC posterior (histogram) and analytic solutions (solid) for the binomial exampl
 ABC posteriors for different tolerance thresholds. The summary statistics is s=|mean(X) - mean(Y)|.
 
 | tolerance | Time sec (GTX1070) | Time sec (Tesla V100) |
-|:----------|------------:|:------------:|
-| 3.0  | 0.32 | 0.20 |
-| 1.0  | 0.52 | 0.27 |
-| 0.1  | 0.65 | 0.29 |
-| 1e-3 | 0.89 | 0.32 |
-| 1e-4 | 2.1  | 0.48 |
-| 1e-5 | 15.2 | 1.91 |
+|:----------|-----------:|:------------:|
+| 3.0  | 0.29 | 0.20 |
+| 1.0  | 0.11 | 0.01 |
+| 0.1  | 0.12 | 0.01 |
+| 1e-3 | 0.25 | 0.03 |
+| 1e-4 | 1.4  | 0.16 |
+| 1e-5 | 14.1 | 1.3 |
+| total| 16.4 | 1.7 |
 
-Note that the unit of time is not minutes but second (and cummurative).
+Note that the unit of time is not minutes but second.
 
 # Random number generators
 
