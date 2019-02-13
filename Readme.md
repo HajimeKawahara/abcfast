@@ -33,12 +33,12 @@ ABC posteriors for different tolerance thresholds. The summary statistics is s=|
 
 | tolerance | Time sec (GTX1070) | Time sec (Tesla V100) |
 |:----------|------------:|:------------:|
-| 3.0  | 0.32 |  |
-| 1.0  | 0.52 |  |
-| 0.1  | 0.65 |  |
-| 1e-3 | 0.89 |  |
-| 1e-4 | 2.1  |  |
-| 1e-5 | 15.2 |  |
+| 3.0  | 0.32 | 0.20 |
+| 1.0  | 0.52 | 0.27 |
+| 0.1  | 0.65 | 0.29 |
+| 1e-3 | 0.89 | 0.32 |
+| 1e-4 | 2.1  | 0.48 |
+| 1e-5 | 15.2 | 1.91 |
 
 Note that the unit of time is not minutes but second.
 
