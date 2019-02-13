@@ -40,7 +40,7 @@ ABC posteriors for different tolerance thresholds. The summary statistics is s=|
 | 1e-4 | 2.1  | 0.48 |
 | 1e-5 | 15.2 | 1.91 |
 
-Note that the unit of time is not minutes but second.
+Note that the unit of time is not minutes but second (and cummurative).
 
 # Random number generators
 
