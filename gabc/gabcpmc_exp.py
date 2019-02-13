@@ -203,7 +203,6 @@ def gabcrm_module ():
     if(ithread==0){
     x[iblock] = xastast;
     ntry[iblock]=cnt;
-
     }
 
     return;
@@ -226,8 +225,6 @@ def gabcrm_module ():
 
     /* ithread := j in TVZ12 */
     int ithread = threadIdx.x;
-
-    unsigned long id = iblock*n + ithread;
     float qf;
 
     /* computing qf (Gaussian transition kernel) */
@@ -303,10 +300,12 @@ if __name__ == "__main__":
 #    plt.show()
 
     epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
-    seed_list=[3,76,81,39,-34,23]
+#    epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2,1.e-3,1.e-4,1.e-5])
+
+    seed_list=[3,76,81,39,-34,23,83,12]
     Niter=len(epsilon_list)
 
-    nt=500
+    nt=512 #should be 2**n because of thread coorporating add.
     sharedsize=0 #byte
 
     #data
@@ -338,6 +337,7 @@ if __name__ == "__main__":
     epsilon=epsilon_list[0]
     pkernel_init(dev_x,np.float32(Ysum),np.float32(epsilon),np.int32(seed),np.float32(alpha_prior),np.float32(beta_prior),dev_ntry,block=(int(n),1,1), grid=(int(nt),1),shared=sharedsize)
     cuda.memcpy_dtoh(x, dev_x)
+    
     cuda.memcpy_dtoh(ntry, dev_ntry)
 
     #x=x
@@ -366,6 +366,7 @@ if __name__ == "__main__":
     #window
     w=np.ones(nt)
     w=w/np.sum(w)
+    w=w.astype(np.float32)
     dev_w = cuda.mem_alloc(w.nbytes)
     cuda.memcpy_htod(dev_w,w)
 
@@ -404,10 +405,7 @@ if __name__ == "__main__":
         
         cuda.memcpy_dtoh(ntry, dev_ntry)
         print("mean, max, min of #try:",np.mean(ntry),np.max(ntry),np.min(ntry))
-
-        cuda.memcpy_dtoh(xx, dev_xx)
-        x,xx=xx,x
-        
+        cuda.memcpy_dtoh(x, dev_xx)
         #x=x
         FR=len(x[x<0])/len(x)
         print("Fail Rate=",FR)
@@ -425,14 +423,14 @@ if __name__ == "__main__":
 
         wkernel(dev_ww, dev_w, dev_xx, dev_x, np.float32(sigmat_prev), block=(int(nt),1,1), grid=(int(nt),1),shared=sharedsize)
 
-        cuda.memcpy_dtoh(ww, dev_ww)
+        cuda.memcpy_dtoh(w, dev_ww)
         
         gampri=gammafunc.ppf(x, alpha_prior,scale=1.0/beta_prior)
-        ww=gampri/ww
-        ww=ww/np.sum(ww)
-        ww=ww.astype(np.float32)
+        w=gampri/w
+        w=w/np.sum(w)
+        w=w.astype(np.float32)
         #swap
-        Ki,Li,Ui=genalias_init(ww)
+        Ki,Li,Ui=genalias_init(w)
         cuda.memcpy_htod(dev_Ki,Ki)
         cuda.memcpy_htod(dev_Li,Li)
         cuda.memcpy_htod(dev_Ui,Ui)
@@ -440,8 +438,7 @@ if __name__ == "__main__":
         dev_x, dev_xx = dev_xx, dev_x
         dev_w, dev_ww = dev_ww, dev_w
 
-
-    print("total=",tend-tstartx)
+    print("total=",tend-tstart)
 
     plt.legend()    
     plt.savefig("pmc_exp.png")
