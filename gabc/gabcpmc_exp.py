@@ -19,7 +19,7 @@ def gabcrm_module ():
     #include "gengamma.h"
     #include "genalias.h"
 
-    #define MAXTRYX 100000
+    #define MAXTRYX 10000000
 
     /* stucture of shared memory */
     /* abcpmc_init */
@@ -39,15 +39,15 @@ def gabcrm_module ():
     }
 
 
-    __device__ float prior(curandState* s){
+    __device__ float prior(curandState* s,float alpha_prior,float beta_prior){
 
-    return gammaf(float(0.1),float(0.1),s);
+    return gammaf(alpha_prior,beta_prior,s);
 
     }
 
 
     extern "C"{
-    __global__ void abcpmc_init(float* x, float Ysum, float epsilon, int seed){
+    __global__ void abcpmc_init(float* x, float Ysum, float epsilon, int seed, float alpha_prior,float beta_prior, int* ntry){
 
     curandState s;
     int cnt = 0;
@@ -69,6 +69,8 @@ def gabcrm_module ():
     if(ithread==0){
     printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
     x[iblock] = -1.0;
+    ntry[iblock]=MAXTRYX;
+
     }
     return;
     }
@@ -76,7 +78,7 @@ def gabcrm_module ():
 
     /* sampling a prior from the Gamma distribution */
     if(ithread == 0){
-    cache[n] = prior(&s);
+    cache[n] = prior(&s,alpha_prior,beta_prior);
     }
     __syncthreads();
     /* ===================================================== */
@@ -112,6 +114,7 @@ def gabcrm_module ():
 
     if(ithread==0){
     x[iblock] = xast;
+    ntry[iblock]=cnt;
     }
 
     return;
@@ -124,7 +127,7 @@ def gabcrm_module ():
     }
     }
 
-    __global__ void abcpmc(float* x, float* xprev, float Ysum, float epsilon, int* Ki, int* Li, float* Ui, float sigmat_prev, int seed){
+    __global__ void abcpmc(float* x, float* xprev, float Ysum, float epsilon, int* Ki, int* Li, float* Ui, float sigmat_prev, int seed, int* ntry){
 
     curandState s;
     int cnt = 0;
@@ -151,6 +154,8 @@ def gabcrm_module ():
     if(ithread==0){
     printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
     x[iblock] = -1.0;
+    ntry[iblock]=MAXTRYX;
+
     }
     return;
     }
@@ -160,7 +165,8 @@ def gabcrm_module ():
     if(ithread == 0){
     isel=aliasgen(Ki, Li, Ui, nt,&s);
     xast = xprev[isel];
-    xastast = xast + curand_normal(&s)/sigmat_prev;
+    xastast = xast + curand_normal(&s)*sigmat_prev;
+
     cache[n] = xastast;
     }
     __syncthreads();
@@ -196,6 +202,8 @@ def gabcrm_module ():
 
     if(ithread==0){
     x[iblock] = xastast;
+    ntry[iblock]=cnt;
+
     }
 
     return;
@@ -206,6 +214,54 @@ def gabcrm_module ():
     
 
     }
+    }
+
+    __global__ void compute_weight(float* wnew, float* wprev, float* xnew, float* xprev, float sigmat_prev){
+    int n = blockDim.x;
+    int nt = gridDim.x;
+
+    /* prev:=t-1, new:=t in TVZ12 */ 
+    /* iblock := i in TVZ12 */
+    int iblock = blockIdx.x;
+
+    /* ithread := j in TVZ12 */
+    int ithread = threadIdx.x;
+
+    unsigned long id = iblock*n + ithread;
+    float qf;
+
+    /* computing qf (Gaussian transition kernel) */
+    qf = exp(-pow((xprev[ithread] - xnew[iblock]),2)/(pow(sigmat_prev,2)));
+
+    /* thread cooperating computation of a denominater */        
+    cache[ithread] = wprev[ithread]*qf;
+    __syncthreads();
+
+    int i = n/2;
+    while(i !=0) {
+        if (ithread < i){
+        cache[ithread] += cache[ithread + i];
+        }
+        __syncthreads();
+        i /= 2;
+    }
+
+    __syncthreads();
+    /* ===================================================== */
+
+    if (ithread==0){
+    /* computing weight */
+    wnew[iblock] = cache[0];
+
+    return;
+
+    }else{
+
+    return;
+
+    }
+
+
     }
 
 
@@ -233,6 +289,9 @@ if __name__ == "__main__":
     n=512 #should be 2**n because of thread coorporating add.
     
     lambda_true=0.1
+    alpha_prior=0.1
+    beta_prior=0.1
+    
     Yobs=random.exponential(1.0/lambda_true,n)
     Ysum=np.sum(Yobs)
 
@@ -243,7 +302,8 @@ if __name__ == "__main__":
 #    plt.title("exponential distribution, lambda="+str(lambda_true))
 #    plt.show()
 
-    epsilon_list = np.array([1.0,0.1])
+    epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
+    seed_list=[3,76,81,39,-34,23]
     Niter=len(epsilon_list)
 
     nt=500
@@ -260,11 +320,12 @@ if __name__ == "__main__":
     dev_x = cuda.mem_alloc(x.nbytes)
     cuda.memcpy_htod(dev_x,x)
 
-    #weight
-    w=np.zeros(nt)
-    w=w.astype(np.float32)
-    dev_w = cuda.mem_alloc(w.nbytes)
-    cuda.memcpy_htod(dev_w,w)
+    #check trial number
+    ntry=np.zeros(nt)
+    ntry=ntry.astype(np.int32)
+    dev_ntry = cuda.mem_alloc(ntry.nbytes)
+    cuda.memcpy_htod(dev_ntry,ntry)
+
     
     source_module=gabcrm_module()
     pkernel_init=source_module.get_function("abcpmc_init")
@@ -273,41 +334,41 @@ if __name__ == "__main__":
 
     # n-thread, N(=nt)-block
     sharedsize=(n+1)*4 #byte
-    seed=10
+    seed=seed_list[0]
     epsilon=epsilon_list[0]
-    pkernel_init(dev_x,np.float32(Ysum),np.float32(epsilon),np.int32(seed),block=(int(n),1,1), grid=(int(nt),1),shared=sharedsize)
+    pkernel_init(dev_x,np.float32(Ysum),np.float32(epsilon),np.int32(seed),np.float32(alpha_prior),np.float32(beta_prior),dev_ntry,block=(int(n),1,1), grid=(int(nt),1),shared=sharedsize)
     cuda.memcpy_dtoh(x, dev_x)
+    cuda.memcpy_dtoh(ntry, dev_ntry)
+
     #x=x
-    NSR=len(x[x<0])/len(x)
-    print("Non-Success Rate=",NSR)
-    if NSR>0:
+    FR=len(x[x<0])/len(x)
+    print("Fail Rate=",FR)
+    if FR>0:
         print("ERROR: Increase epsilon or MAXVALX in kernel.")
         sys.exit("")
-        
+    print("mean, max, min of #try:",np.mean(ntry),np.max(ntry),np.min(ntry))
     tend=time.time()
     print("t=",tend-tstart)
-
+    
 
     #plt.plot(np.log10(x),".")
     #plt.show()
 
-    plt.hist(x,bins=30,label="$\epsilon$="+str(epsilon),density=True,alpha=0.5)
+    plt.hist(x,bins=30,label="$\epsilon$="+str(epsilon),density=True,alpha=0.3)
     plt.xlabel("lambda")
-    alpha=0.1+n
-    beta=0.1+Ysum
+    alpha=alpha_prior+n
+    beta=beta_prior+Ysum
     xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")
     plt.legend()
     #========================================================================
-    
-    #particles
-    xx=np.zeros(nt)
-    xx=xx.astype(np.float32)
-    dev_xx = cuda.mem_alloc(xx.nbytes)
-    cuda.memcpy_htod(dev_xx,xx)
 
     #window
     w=np.ones(nt)
+    w=w/np.sum(w)
+    dev_w = cuda.mem_alloc(w.nbytes)
+    cuda.memcpy_htod(dev_w,w)
+
     Ki,Li,Ui=genalias_init(w)
     dev_Ki = cuda.mem_alloc(Ki.nbytes)
     dev_Li = cuda.mem_alloc(Li.nbytes)
@@ -317,30 +378,69 @@ if __name__ == "__main__":
     cuda.memcpy_htod(dev_Li,Li)
     cuda.memcpy_htod(dev_Ui,Ui)
     
+    #particles (new)
+    xx=np.zeros(nt)
+    xx=xx.astype(np.float32)
+    dev_xx = cuda.mem_alloc(xx.nbytes)
+    cuda.memcpy_htod(dev_xx,xx)
+    
+    #weight (new)
+    ww=np.zeros(nt)
+    ww=ww.astype(np.float32)
+    dev_ww = cuda.mem_alloc(ww.nbytes)
+    cuda.memcpy_htod(dev_ww,ww)
+
+    pkernel=source_module.get_function("abcpmc")
+    wkernel=source_module.get_function("compute_weight")
+
     #pmc sequence
     for j,epsilon in enumerate(epsilon_list[1:]):
         print(j,epsilon)
-        sigmat_prev = np.sqrt(2.0*np.std(x))
+        seed = seed_list[j+1]
+        sigmat_prev = np.sqrt(2.0*np.var(x))
+        sharedsize=(n+1)*4 #byte
+        pkernel(dev_xx,dev_x,np.float32(Ysum),np.float32(epsilon),dev_Ki,dev_Li,dev_Ui,np.float32(sigmat_prev),np.int32(seed),dev_ntry,block=(int(n),1,1), grid=(int(nt),1),shared=sharedsize)
         
-        pkernel=source_module.get_function("abcpmc")
-        #p0(float* x, float Ysum, float epsilon, float* w, float sigmat_prev, int seed){
-        pkernel(dev_xx,dev_x,np.float32(Ysum),np.float32(epsilon),dev_Ki,dev_Li,dev_Ui,np.float32(sigmat_prev),np.int32(seed),block=(int(n),1,1), grid=(int(nt),1),shared=sharedsize)
-        cuda.memcpy_dtoh(x, dev_xx)
+        cuda.memcpy_dtoh(ntry, dev_ntry)
+        print("mean, max, min of #try:",np.mean(ntry),np.max(ntry),np.min(ntry))
+
+        cuda.memcpy_dtoh(xx, dev_xx)
+        x,xx=xx,x
+        
         #x=x
-        NSR=len(x[x<0])/len(x)
-        print("Non-Success Rate=",NSR)
-        if NSR>0:
+        FR=len(x[x<0])/len(x)
+        print("Fail Rate=",FR)
+        if FR>0:
             print("ERROR: Increase epsilon or MAXVALX in kernel.")
             sys.exit("")
         
         tend=time.time()
         print("t=",tend-tstart)
+        plt.hist(x,bins=10,label="$\epsilon$="+str(epsilon),density=True,alpha=0.3)
+        
+        #update weight
+        sharedsize=(nt)*4 #byte
+#    __global__ void compute_weight(float* wnew, float* wprev, float* xnew, float* xprev, float sigmat_prev){
 
-    
-        plt.hist(x,bins=30,label="$\epsilon$="+str(epsilon),density=True,alpha=0.5)
+        wkernel(dev_ww, dev_w, dev_xx, dev_x, np.float32(sigmat_prev), block=(int(nt),1,1), grid=(int(nt),1),shared=sharedsize)
 
+        cuda.memcpy_dtoh(ww, dev_ww)
+        
+        gampri=gammafunc.ppf(x, alpha_prior,scale=1.0/beta_prior)
+        ww=gampri/ww
+        ww=ww/np.sum(ww)
+        ww=ww.astype(np.float32)
+        #swap
+        Ki,Li,Ui=genalias_init(ww)
+        cuda.memcpy_htod(dev_Ki,Ki)
+        cuda.memcpy_htod(dev_Li,Li)
+        cuda.memcpy_htod(dev_Ui,Ui)
+
+        dev_x, dev_xx = dev_xx, dev_x
+        dev_w, dev_ww = dev_ww, dev_w
+        
     plt.legend()    
-    plt.savefig("pmc.png")
+    plt.savefig("pmc_exp.png")
     plt.show()
     #========================================================================
 
