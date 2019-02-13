@@ -441,7 +441,7 @@ if __name__ == "__main__":
         dev_w, dev_ww = dev_ww, dev_w
 
 
-    print("total=",tend-tstartx)
+    print("total=",tend-tstart)
 
     plt.legend()    
     plt.savefig("pmc_exp.png")
