@@ -94,9 +94,8 @@ if __name__ == "__main__":
     print(":Gamma[alpha,beta] for alpha > 0, beta >0")
     print("********************************************")
 
-    alpha=0.1
-    beta=0.1
-    
+    alpha=3.0
+    beta=2.0
     nw=1
     nt=100000
     nq=1
@@ -114,10 +113,10 @@ if __name__ == "__main__":
 
     plt.hist(x,bins=100,density=True)
 #    plt.hist(np.log10(x[x>0]),bins=100,density=True)
-    plt.yscale("log")
+    #plt.yscale("log")
 #    plt.xscale("log")
 
-    xl = np.linspace(gammafunc.ppf(0.01, alpha,scale=1.0/beta),gammafunc.ppf(0.99, alpha,scale=1.0/beta), 100)
+    xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta))
 #    plt.axvline(np.log10(np.mean(x)),color="red")
     plt.axvline(np.mean(x),color="red")
