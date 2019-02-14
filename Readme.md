@@ -43,8 +43,9 @@ ABC posteriors for different tolerance thresholds. The summary statistics is s=|
 
 Note that the unit of time is not minutes but second.
 
-# Random number generators
+# Random number generators using curand_kernel.h
 
 Directory: random_gen
 
-- uniform, normal, gamma distribution, beta distribution, binomial distribution
+- uniform, normal, gamma distribution, beta distribution, binomial distribution, random choise with discrete probability p_i (the alias method).
+
