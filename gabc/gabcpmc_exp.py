@@ -26,7 +26,7 @@ def gabcrm_module ():
     /* i=0,...,n-1, are X[i], i=n is used for a block prior (xast) */
     
     /* abcpmc */
-    /* i=0,...,n-1, are X[i], i=n,...,n+nt-1, are previous X[i] i=n+nt is used for a block prior (xast) */
+    /* i=0,...,n-1, are X[i], i=n,...,n+npart-1, are previous X[i] i=n+npart is used for a block prior (xast) */
 
 
     extern __shared__ float cache[]; 
@@ -136,7 +136,7 @@ def gabcrm_module ():
     float xastast;
     float rho;
     int n = blockDim.x;
-    int nt = gridDim.x;
+    int npart = gridDim.x;
     int iblock = blockIdx.x;
     int ithread = threadIdx.x;
     unsigned long id = iblock*n + ithread;
@@ -163,7 +163,7 @@ def gabcrm_module ():
 
     /* sampling a prior from the previous posterior*/
     if(ithread == 0){
-    isel=aliasgen(Ki, Li, Ui, nt,&s);
+    isel=aliasgen(Ki, Li, Ui, npart,&s);
     xast = xprev[isel];
     xastast = xast + curand_normal(&s)*sigmat_prev;
 
@@ -216,8 +216,11 @@ def gabcrm_module ():
     }
 
     __global__ void compute_weight(float* wnew, float* wprev, float* xnew, float* xprev, float sigmat_prev){
-    int n = blockDim.x;
-    int nt = gridDim.x;
+    int nthread = blockDim.x;
+    int npart = gridDim.x;
+    float rnthread = float(nthread);
+    float rnpart = float(npart);
+    int ipart;
 
     /* prev:=t-1, new:=t in TVZ12 */ 
     /* iblock := i in TVZ12 */
@@ -226,21 +229,31 @@ def gabcrm_module ():
     /* ithread := j in TVZ12 */
     int ithread = threadIdx.x;
     float qf;
+    
+    for (int m=0; m<npart/nthread; m++){
 
+    ipart = m*nthread+ithread;
     /* computing qf (Gaussian transition kernel) */
-    qf = exp(-pow((xprev[ithread] - xnew[iblock]),2)/(pow(sigmat_prev,2)));
-
+    qf = exp(-pow((xprev[ipart] - xnew[iblock]),2)/(pow(sigmat_prev,2)));
     /* thread cooperating computation of a denominater */        
-    cache[ithread] = wprev[ithread]*qf;
+    cache[ipart] = wprev[ipart]*qf;
+
+    }
     __syncthreads();
 
-    int i = n/2;
+    int i = npart/2;
     while(i !=0) {
-        if (ithread < i){
-        cache[ithread] += cache[ithread + i];
-        }
-        __syncthreads();
-        i /= 2;
+
+    for (int m=0; m<npart/nthread; m++){
+
+    ipart = m*nthread+ithread;
+    if (ipart < i){
+    cache[ipart] += cache[ipart + i];
+    }
+    __syncthreads();
+    i /= 2;
+
+    }
     }
 
     __syncthreads();
@@ -283,7 +296,8 @@ if __name__ == "__main__":
     print("GPU ABC PMC Method.")
     print("This code demonstrates an exponential example in Section 5 in Turner and Van Zandt (2012) JMP 56, 69")
     print("*******************************************")
-    n=512 #should be 2**n because of thread coorporating add.
+    n=512 # number of the samples the should be 2**n because of thread coorporating add.
+    npart=512*16 # number of the particles: should be 2**n because of thread coorporating add.
     
     lambda_true=0.1
     alpha_prior=0.1
@@ -292,55 +306,38 @@ if __name__ == "__main__":
     Yobs=random.exponential(1.0/lambda_true,n)
     Ysum=np.sum(Yobs)
 
-#    plt.hist(Yobs,bins=100,density=True,alpha=0.5,label="numpy random")
-#    xl = np.linspace(expfunc.ppf(0.001, scale=1.0/lambda_true),expfunc.ppf(0.999, scale=1.0/lambda_true), 100)
-#    plt.plot(xl, expfunc.pdf(xl, scale=1.0/lambda_true))
-#    plt.axvline(Ysum/n)
-#    plt.title("exponential distribution, lambda="+str(lambda_true))
-#    plt.show()
-
     epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
-#    epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2,1.e-3,1.e-4,1.e-5])
+    allist = [0.3,0.1,0.1,0.1,0.1,0.5]
+#    epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2])
 
     seed_list=[3,76,81,39,-34,23,83,12]
     Niter=len(epsilon_list)
-
-    nt=2048 #should be 2**n because of thread coorporating add.
-    sharedsize=0 #byte
-
-    #data
-    #Yobs=Yobs.astype(np.float32)
-    #    dev_y = cuda.mem_alloc(Yobs.nbytes)
-    #    cuda.memcpy_htod(dev_y,Yobs)
     
     #particles
-    x=np.zeros(nt)
+    x=np.zeros(npart)
     x=x.astype(np.float32)
     dev_x = cuda.mem_alloc(x.nbytes)
     cuda.memcpy_htod(dev_x,x)
 
     #check trial number
-    ntry=np.zeros(nt)
+    ntry=np.zeros(npart)
     ntry=ntry.astype(np.int32)
     dev_ntry = cuda.mem_alloc(ntry.nbytes)
     cuda.memcpy_htod(dev_ntry,ntry)
-
     
     source_module=gabcrm_module()
     pkernel_init=source_module.get_function("abcpmc_init")
 
     #initial run
-
-    # n-thread, N(=nt)-block
+    ## n-thread, N(=nt)-block
     sharedsize=(n+1)*4 #byte
     seed=seed_list[0]
     epsilon=epsilon_list[0]
-    pkernel_init(dev_x,np.float32(Ysum),np.float32(epsilon),np.int32(seed),np.float32(alpha_prior),np.float32(beta_prior),dev_ntry,block=(int(n),1,1), grid=(int(nt),1),shared=sharedsize)
+    pkernel_init(dev_x,np.float32(Ysum),np.float32(epsilon),np.int32(seed),np.float32(alpha_prior),np.float32(beta_prior),dev_ntry,block=(int(n),1,1), grid=(int(npart),1),shared=sharedsize)
+
     cuda.memcpy_dtoh(x, dev_x)
-    
     cuda.memcpy_dtoh(ntry, dev_ntry)
 
-    #x=x
     FR=len(x[x<0])/len(x)
     print("Fail Rate=",FR)
     if FR>0:
@@ -350,11 +347,8 @@ if __name__ == "__main__":
     tend=time.time()
     print("t=",tend-tstart)
     
-
-    #plt.plot(np.log10(x),".")
-    #plt.show()
-
-    plt.hist(x,bins=30,label="$\epsilon$="+str(epsilon),density=True,alpha=0.3)
+    #========================================================================
+    plt.hist(x,bins=50,label="$\epsilon$="+str(epsilon),density=True,alpha=0.3)
     plt.xlabel("lambda")
     alpha=alpha_prior+n
     beta=beta_prior+Ysum
@@ -364,7 +358,7 @@ if __name__ == "__main__":
     #========================================================================
 
     #window
-    w=np.ones(nt)
+    w=np.ones(npart)
     w=w/np.sum(w)
     w=w.astype(np.float32)
     dev_w = cuda.mem_alloc(w.nbytes)
@@ -380,13 +374,13 @@ if __name__ == "__main__":
     cuda.memcpy_htod(dev_Ui,Ui)
     
     #particles (new)
-    xx=np.zeros(nt)
+    xx=np.zeros(npart)
     xx=xx.astype(np.float32)
     dev_xx = cuda.mem_alloc(xx.nbytes)
     cuda.memcpy_htod(dev_xx,xx)
     
     #weight (new)
-    ww=np.zeros(nt)
+    ww=np.zeros(npart)
     ww=ww.astype(np.float32)
     dev_ww = cuda.mem_alloc(ww.nbytes)
     cuda.memcpy_htod(dev_ww,ww)
@@ -401,7 +395,7 @@ if __name__ == "__main__":
         seed = seed_list[j+1]
         sigmat_prev = np.sqrt(2.0*np.var(x))
         sharedsize=(n+1)*4 #byte
-        pkernel(dev_xx,dev_x,np.float32(Ysum),np.float32(epsilon),dev_Ki,dev_Li,dev_Ui,np.float32(sigmat_prev),np.int32(seed),dev_ntry,block=(int(n),1,1), grid=(int(nt),1),shared=sharedsize)
+        pkernel(dev_xx,dev_x,np.float32(Ysum),np.float32(epsilon),dev_Ki,dev_Li,dev_Ui,np.float32(sigmat_prev),np.int32(seed),dev_ntry,block=(int(n),1,1), grid=(int(npart),1),shared=sharedsize)
         
         cuda.memcpy_dtoh(ntry, dev_ntry)
         print("mean, max, min of #try:",np.mean(ntry),np.max(ntry),np.min(ntry))
@@ -415,13 +409,13 @@ if __name__ == "__main__":
         
         tend=time.time()
         print("t=",tend-tstartx)
-        plt.hist(x,bins=10,label="$\epsilon$="+str(epsilon),density=True,alpha=0.3)
+        plt.hist(x,bins=50,label="$\epsilon$="+str(epsilon),density=True,alpha=allist[j+1])
         
         #update weight
-        sharedsize=(nt)*4 #byte
-#    __global__ void compute_weight(float* wnew, float* wprev, float* xnew, float* xprev, float sigmat_prev){
-
-        wkernel(dev_ww, dev_w, dev_xx, dev_x, np.float32(sigmat_prev), block=(int(nt),1,1), grid=(int(nt),1),shared=sharedsize)
+        sharedsize=int(npart*4) #byte
+        nthread=min(npart,1024)
+        
+        wkernel(dev_ww, dev_w, dev_xx, dev_x, np.float32(sigmat_prev), block=(int(nthread),1,1), grid=(int(npart),1),shared=sharedsize)
 
         cuda.memcpy_dtoh(w, dev_ww)
         
