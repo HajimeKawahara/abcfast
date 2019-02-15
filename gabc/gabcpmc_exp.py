@@ -234,7 +234,7 @@ def gabcrm_module ():
 
     ipart = m*nthread+ithread;
     /* computing qf (Gaussian transition kernel) */
-    qf = exp(-pow((xprev[ipart] - xnew[iblock]),2)/(pow(sigmat_prev,2)));
+    qf = exp(-pow((xprev[ipart] - xnew[iblock]),2)/(2.0*pow(sigmat_prev,2)));
     /* thread cooperating computation of a denominater */        
     cache[ipart] = wprev[ipart]*qf;
 
@@ -281,6 +281,13 @@ def gabcrm_module ():
 
     return source_module
 
+def checkpower2(n):
+    logn=np.log2(n)
+    if logn - int(logn) > 0.0:
+        print("n=",n)
+        sys.exit("Use 2^(integer) as n.")
+    return
+        
 if __name__ == "__main__":
     import numpy as np
     import matplotlib.pyplot as plt
@@ -296,8 +303,14 @@ if __name__ == "__main__":
     print("GPU ABC PMC Method.")
     print("This code demonstrates an exponential example in Section 5 in Turner and Van Zandt (2012) JMP 56, 69")
     print("*******************************************")
+    nthread_use_max=512 # maximun number of the threads in a block for use
+
     n=512 # number of the samples the should be 2**n because of thread coorporating add.
-    npart=512*16 # number of the particles: should be 2**n because of thread coorporating add.
+    npart=512*8 # number of the particles: should be 2**n because of thread coorporating add.
+    checkpower2(n)
+    checkpower2(npart)
+
+    wide=10.0 # widespread factor for the gaussian kernel. do not set less than sqrt(2).
     
     lambda_true=0.1
     alpha_prior=0.1
@@ -393,7 +406,7 @@ if __name__ == "__main__":
         tstartx=time.time()
         print(j,epsilon)
         seed = seed_list[j+1]
-        sigmat_prev = np.sqrt(2.0*np.var(x))
+        sigmat_prev = wide*np.sqrt(np.var(x))
         sharedsize=(n+1)*4 #byte
         pkernel(dev_xx,dev_x,np.float32(Ysum),np.float32(epsilon),dev_Ki,dev_Li,dev_Ui,np.float32(sigmat_prev),np.int32(seed),dev_ntry,block=(int(n),1,1), grid=(int(npart),1),shared=sharedsize)
         
@@ -413,7 +426,7 @@ if __name__ == "__main__":
         
         #update weight
         sharedsize=int(npart*4) #byte
-        nthread=min(npart,1024)
+        nthread=min(npart,nthread_use_max)
         
         wkernel(dev_ww, dev_w, dev_xx, dev_x, np.float32(sigmat_prev), block=(int(nthread),1,1), grid=(int(npart),1),shared=sharedsize)
 

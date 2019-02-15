@@ -20,13 +20,17 @@ def gabcrm_module ():
     curandState s;
     float xuni;
 
-    seed=10;
+    seed=-1;
     id = blockIdx.x;
     curand_init(seed, id, 0, &s);
     xuni = 1.0 - curand_uniform(&s);
 
     float pb = xuni * float(nt);
     int index = __float2int_rd(pb);
+
+    if(xuni == 1.0){
+    index = 0;
+    }
     
     if(Ui[index] < pb - index){
     x[id] = Ki[index];
@@ -93,7 +97,7 @@ if __name__ == "__main__":
     dev_Ki,dev_Li,dev_Ui=alias_init(parrs)
     
     nw=1
-    nt=10000
+    nt=30000
     nq=1
     nb = nw*nt*nq 
     sharedsize=0 #byte
@@ -110,6 +114,8 @@ if __name__ == "__main__":
 
     plt.hist(x,bins=100)
     plt.plot(range(0,len(parrs)),np.array(parrs)*len(x)/np.sum(parrs),"*",label="$p_i$")
+    plt.errorbar(range(0,len(parrs)),np.array(parrs)*len(x)/np.sum(parrs),yerr=np.sqrt(np.array(parrs)*len(x)/np.sum(parrs)),fmt=".")
+
     plt.legend()
     plt.xticks(range(0,len(parrs)))
     plt.show()
