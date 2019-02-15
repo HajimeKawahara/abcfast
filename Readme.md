@@ -1,6 +1,4 @@
-GPU Approximate Baysian Computation
-
-Under development.
+GPU Approximate Baysian Computation. Under development.
 
 # setting
 
@@ -17,7 +15,7 @@ gabc uses header files for nvcc. set CPLUS_INCLUDE_PATH to gabc/include.
 
 ## ABC rejection sampling algorithm
 
-- gabcrm.py the GPU version of ABC rejection sampling algorithm, demonstrating a binomial example in Section 4 of [Turner and Van Zandt (2012) JMP 56, 69](https://www.sciencedirect.com/science/article/abs/pii/S0022249612000272?via%3Dihub)
+- gabcrm_bin.py the GPU version of ABC rejection sampling algorithm, demonstrating a binomial example in Section 4 of [Turner and Van Zandt (2012) JMP 56, 69](https://www.sciencedirect.com/science/article/abs/pii/S0022249612000272?via%3Dihub)
 
 <img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/abcrm10.png" Titie="explanation" Width=250px><img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/abcrm100.png" Titie="explanation" Width=250px><img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/abcrm1000.png" Titie="explanation" Width=250px>
 
