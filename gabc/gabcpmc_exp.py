@@ -301,7 +301,7 @@ if __name__ == "__main__":
     
     print("*******************************************")
     print("GPU ABC PMC Method.")
-    print("This code demonstrates an exponential example in Section 5 in Turner and Van Zandt (2012) JMP 56, 69")
+    print("This code demonstrates an exponential example in Section 5 in Turner and Van Zandt (2012) JMP 56, 69, with some modifications.")
     print("*******************************************")
     nthread_use_max=512 # maximun number of the threads in a block for use
 
@@ -310,7 +310,7 @@ if __name__ == "__main__":
     checkpower2(n)
     checkpower2(npart)
 
-    wide=10.0 # widespread factor for the gaussian kernel. do not set less than sqrt(2).
+    wide=2.0 # widespread factor of the gaussian transition kernel. Do not set less than 2 (=TVZ12).
     
     lambda_true=0.1
     alpha_prior=0.1
@@ -406,7 +406,9 @@ if __name__ == "__main__":
         tstartx=time.time()
         print(j,epsilon)
         seed = seed_list[j+1]
-        sigmat_prev = wide*np.sqrt(np.var(x))
+
+        sigmat_prev = np.sqrt(wide*np.var(x))
+        
         sharedsize=(n+1)*4 #byte
         pkernel(dev_xx,dev_x,np.float32(Ysum),np.float32(epsilon),dev_Ki,dev_Li,dev_Ui,np.float32(sigmat_prev),np.int32(seed),dev_ntry,block=(int(n),1,1), grid=(int(npart),1),shared=sharedsize)
         
