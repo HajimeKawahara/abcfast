@@ -9,7 +9,7 @@ gabc uses header files for nvcc. set CPLUS_INCLUDE_PATH to gabc/include.
 
 ```
 
-# algorithms
+# Algorithms
 
 ## ABC rejection sampling algorithm
 
@@ -41,4 +41,4 @@ You need to prepare
 - prior: random number generator from a prior distribution
 - fprior: a prior density distribution
 
-This code is in the beta stage (very unstable). Ask Hajime Kawahara(http://secondearths.sakura.ne.jp/en/index.html) for more details.
+This code is in the beta stage (very unstable). Ask [Hajime Kawahara](http://secondearths.sakura.ne.jp/en/index.html) for more details.
