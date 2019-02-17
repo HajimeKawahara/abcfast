@@ -1,26 +1,10 @@
 from gabc.gabcpmc import *
-import time
-import matplotlib.pyplot as plt
-import math
-import numpy as np
-import pycuda.autoinit
-import pycuda.driver as cuda
-import pycuda.compiler
-from pycuda.compiler import SourceModule
 from gabc.utils.statutils import *
-
-def checkpower2(n):
-    logn=np.log2(n)
-    if logn - int(logn) > 0.0:
-        print("n=",n)
-        sys.exit("Use 2^(integer) as n.")
-    return
         
 if __name__ == "__main__":
     import numpy as np
     import matplotlib.pyplot as plt
     from numpy import random
-    from scipy.stats import expon as expfunc
     from scipy.stats import gamma as gammafunc
     import time
     import sys
@@ -39,7 +23,7 @@ if __name__ == "__main__":
     #Ysum=np.sum(Yobs)
 
     #start ABCpmc 
-    abc=ABCpmc(512*8,Yobs)
+    abc=ABCpmc(512,Yobs)
     
     abc.model=\
     """
@@ -76,7 +60,7 @@ if __name__ == "__main__":
     plt.hist(abc.x,bins=50,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
 
     #pmc sequence
-    for j,epsilon in enumerate(abc.epsilon_list[1:]):
+    for eps in abc.epsilon_list[1:]:
         abc.run()
         abc.check()
 
@@ -88,7 +72,6 @@ if __name__ == "__main__":
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")
     plt.xlabel("$\lambda$")
     plt.ylabel("$\pi_\mathrm{ABC}$")
-
     plt.legend()
     plt.savefig("abcpmc.png")
     plt.show()
