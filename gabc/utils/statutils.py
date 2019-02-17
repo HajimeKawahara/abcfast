@@ -4,6 +4,17 @@ import pycuda.driver as cuda
 import pycuda.compiler
 from pycuda.compiler import SourceModule
 
+def getptwo(n):
+    i=0
+    while n > 2**i:
+        i=i+1
+    return 2**(i-1)
+
+def checkpower2(n):
+    logn=np.log2(n)
+    if logn - int(logn) > 0.0:
+        return True
+
 def genalias_init(parrs):
     parr=np.array(parrs, np.float32)
     parr = parr/np.sum(parr)

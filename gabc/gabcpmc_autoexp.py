@@ -103,6 +103,7 @@ if __name__ == "__main__":
     dev_dist = cuda.mem_alloc(dist.nbytes)
     cuda.memcpy_htod(dev_dist,dist)
 
+
     
     source_module=gabcrm_module()
     pkernel_init=source_module.get_function("abcpmc_init")
@@ -205,7 +206,7 @@ if __name__ == "__main__":
             plt.hist(x,bins=50,label="$\epsilon$="+str(epsilon),density=True,alpha=0.5)
 
         #UPDATE
-        gampri=gammafunc.ppf(x, alpha_prior,scale=1.0/beta_prior)
+        gampri=gammafunc.pdf(x, alpha_prior,scale=1.0/beta_prior)
         w=gampri/w
         w=w/np.sum(w)
         w=w.astype(np.float32)

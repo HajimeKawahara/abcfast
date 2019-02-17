@@ -94,8 +94,8 @@ if __name__ == "__main__":
     print(":Gamma[alpha,beta] for alpha > 0, beta >0")
     print("********************************************")
 
-    alpha=3.0
-    beta=2.0
+    alpha=2.0
+    beta=3.0
     nw=1
     nt=100000
     nq=1
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta))
 #    plt.axvline(np.log10(np.mean(x)),color="red")
     plt.axvline(np.mean(x),color="red")
-
+    plt.yscale("log")
     print("mean=",np.mean(x))
     plt.title("Gamma Distribution, alpha="+str(alpha)+" beta="+str(beta))
     plt.show()

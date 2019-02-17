@@ -3,7 +3,7 @@
 /* i=0,...,n-1, are X[i], i=n is used for a block prior (xast) */
 
 extern "C"{
-  __global__ void abcpmc_init(float* x, float Ysum, float epsilon, int seed, float alpha_prior,float beta_prior, float* dist, int* ntry){
+  __global__ void abcpmc_init(float* x, float Ysum, float epsilon, int seed, float* parprior, float* dist, int* ntry, int ptwo){
 
     curandState s;
     int cnt = 0;
@@ -23,7 +23,7 @@ extern "C"{
     cnt++;
     if(cnt > MAXTRYX){
     if(ithread==0){
-    printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
+    printf("EXCEED MAXTRYX. iblock=%d \n",iblock);
     x[iblock] = -1.0;
     ntry[iblock]=MAXTRYX;
 
@@ -34,7 +34,7 @@ extern "C"{
 
     /* sampling a prior from the Gamma distribution */
     if(ithread == 0){
-    cache[n] = prior(&s,alpha_prior,beta_prior);
+    cache[n] = prior(&s, parprior);
     }
     __syncthreads();
     /* ===================================================== */
@@ -51,10 +51,11 @@ extern "C"{
 
 
 
-    /* thread cooperating computation of rho */        
-    int i = n/2;
+    /* thread cooperating computation of rho */
+    int i = ptwo;
+    /*int i = n/2;*/
     while(i !=0) {
-        if (ithread < i){
+        if ( ithread + i < n && ithread < i){
         cache[ithread] += cache[ithread + i];
         }
         __syncthreads();

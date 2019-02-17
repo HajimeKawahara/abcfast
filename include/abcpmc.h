@@ -4,7 +4,7 @@
 
 extern "C"{
 
-      __global__ void abcpmc(float* x, float* xprev, float Ysum, float epsilon, int* Ki, int* Li, float* Ui, float sigmat_prev, int seed, float* dist, int* ntry){
+  __global__ void abcpmc(float* x, float* xprev, float Ysum, float epsilon, int* Ki, int* Li, float* Ui, float sigmat_prev, int seed, float* dist, int* ntry, int ptwo){
 
     curandState s;
     int cnt = 0;
@@ -58,11 +58,12 @@ extern "C"{
     /* ===================================================== */
 
 
-
+    /* SUMMARY STATISTICS (currently summation with power of 2 samples) */
     /* thread cooperating computation of rho */        
-    int i = n/2;
+    /*    int i = n/2; */
+    int i = ptwo;
     while(i !=0) {
-        if (ithread < i){
+        if (ithread + i < n && ithread < i){
         cache[ithread] += cache[ithread + i];
         }
         __syncthreads();

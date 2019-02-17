@@ -47,3 +47,11 @@ Directory: random_gen
 
 - uniform, normal, gamma distribution, beta distribution, binomial distribution, random choise with discrete probability p_i (the alias method).
 
+# Customizing ABC
+
+You need to prepare
+
+- model: data sampler with given model parameters
+- prior: random number generator from a prior distribution
+- fprior: a prior density distribution
+
