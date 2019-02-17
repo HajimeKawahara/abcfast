@@ -39,7 +39,7 @@ if __name__ == "__main__":
     #Ysum=np.sum(Yobs)
 
     #start ABCpmc 
-    abc=ABCpmc(512*4,Yobs)
+    abc=ABCpmc(512*8,Yobs)
     
     abc.model=\
     """
@@ -86,6 +86,9 @@ if __name__ == "__main__":
     beta=abc.parprior[1]+np.sum(abc.Yobs)
     xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")
+    plt.xlabel("$\lambda$")
+    plt.ylabel("$\pi_\mathrm{ABC}$")
+
     plt.legend()
     plt.savefig("abcpmc.png")
     plt.show()

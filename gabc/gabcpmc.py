@@ -50,7 +50,7 @@ class ABCpmc(object):
         self.ptwo = getptwo(self.n)
 
 
-        self.wide=2.0
+        self.wide=8.0
         self.epsilon_list = False
         self.nthread_use_max=512 # maximun number of the threads in a block for use
 
