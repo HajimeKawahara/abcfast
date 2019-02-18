@@ -24,25 +24,28 @@ if __name__ == "__main__":
 
     #start ABCpmc 
     abc=ABCpmc(512,Yobs)
-    
+    abc.npar=1
     abc.model=\
     """
     /* the exponential distribution model generator */
-    __device__ float model(float lambdain,curandState *s){
+
+    __device__ float model(float* lambdain, curandState* s){
     
-    return  -log(curand_uniform(s))/lambdain;
+    return  -log(curand_uniform(s))/lambdain[0];
 
     }
     """
-    # set random number generator of a prior
     abc.prior=\
     """
-    __device__ float prior(curandState* s,float* parprior){
+    __device__ void prior(float* parprior,float* xprior,curandState* s){
 
-    return gammaf(parprior[0],parprior[1],s);
+    xprior[0] = gammaf(parprior[0],parprior[1],s);
+
+    return;
 
     }
     """
+    
     # prior functional form
     def fprior():
         def f(x,parprior):
@@ -57,7 +60,7 @@ if __name__ == "__main__":
     #initial run of abc pmc
     abc.run()
     abc.check()
-    plt.hist(abc.x,bins=50,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
 
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
@@ -65,7 +68,7 @@ if __name__ == "__main__":
         abc.check()
 
     #plotting...
-    plt.hist(abc.x,bins=50,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
     alpha=abc.parprior[0]+abc.n
     beta=abc.parprior[1]+np.sum(abc.Yobs)
     xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)

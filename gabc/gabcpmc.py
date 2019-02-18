@@ -5,7 +5,7 @@ from pycuda.compiler import SourceModule
 from gabc.utils.statutils import *
 import sys
 
-def gabcpmc_module (model,prior):
+def gabcpmc_module (model,prior,npar):
     header=\
     """
     #include <stdio.h>
@@ -16,7 +16,8 @@ def gabcpmc_module (model,prior):
 
     extern __shared__ volatile float cache[]; 
 
-    """
+    """+"#define NPAR "+str(npar)+"\n"
+    
     footer=\
     """
     #include "abcpmc_init.h"
@@ -24,7 +25,7 @@ def gabcpmc_module (model,prior):
     #include "compute_weight.h"
 
     """
-
+    print(header+model+prior+footer)
     source_module = SourceModule(header+model+prior+footer,options=['-use_fast_math'],no_extern_c=True)
 
     return source_module
@@ -71,7 +72,7 @@ class ABCpmc(object):
         self.dev_Li = None
         self.dev_Ui = None
         self.seed = -1
-
+        self.npar = 1
         
 
     @property
@@ -104,7 +105,7 @@ class ABCpmc(object):
         
     def update_kernel(self):        
         if self._model is not None and self._prior is not None:
-            self.source_module=gabcpmc_module(self._model,self._prior)
+            self.source_module=gabcpmc_module(self._model,self._prior,self.npar)
             self.pkernel_init=self.source_module.get_function("abcpmc_init")
             self.pkernel=self.source_module.get_function("abcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
@@ -116,7 +117,7 @@ class ABCpmc(object):
             print("currently |X-Y|/n is only available for summary statistics.")
             Ysum=np.sum(self.Yobs)
             self.epsilon=self.epsilon_list[self.iteration]
-            sharedsize=(self.n+1)*4 #byte
+            sharedsize=(self.n+self.npar)*4 #byte
             self.pkernel_init(self.dev_x,np.float32(Ysum),np.float32(self.epsilon),np.int32(self.seed),self.dev_parprior,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self.npart),1),shared=sharedsize)
 
             cuda.memcpy_dtoh(self.x, self.dev_x)
@@ -132,7 +133,7 @@ class ABCpmc(object):
             print("currently |X-Y|/n is only available for summary statistics.")
             Ysum=np.sum(self.Yobs)
             self.epsilon=self.epsilon_list[self.iteration]
-            sharedsize=(self.n+1)*4 #byte
+            sharedsize=(self.n++self.npar)*4 #byte
 
             self.pkernel(self.dev_xx,self.dev_x,np.float32(Ysum),np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,np.float32(self.sigmat_prev),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self.npart),1),shared=sharedsize)
 

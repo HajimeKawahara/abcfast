@@ -9,8 +9,6 @@ extern "C"{
     curandState s;
     int cnt = 0;
     float p;
-    float xast;
-    float xastast;
     float rho;
     int n = blockDim.x;
     int npart = gridDim.x;
@@ -19,6 +17,7 @@ extern "C"{
     unsigned long id = iblock*n + ithread;
     float uni;
     int isel;
+    float xprior[NPAR];
     
     curand_init(seed, id, 0, &s);
 
@@ -27,32 +26,34 @@ extern "C"{
     /* limitter */
     cnt++;
     if(cnt > MAXTRYX){
-    if(ithread==0){
-    printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
-    x[iblock] = -1.0;
-    ntry[iblock]=MAXTRYX;
+      if(ithread==0){
+	printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
+	  for (int m=0; m<NPAR; m++){
+	    x[NPAR*iblock + m] = -1.0;
+	  }
+	  ntry[iblock]=MAXTRYX;	  
+      }
+      return;
+    }
     
-    }
-    return;
-    }
-
 
     /* sampling a prior from the previous posterior*/
     if(ithread == 0){
-    isel=aliasgen(Ki, Li, Ui, npart,&s);
-    xast = xprev[isel];
-    xastast = xast + curand_normal(&s)*sigmat_prev;
-
-    cache[n] = xastast;
+      isel=aliasgen(Ki, Li, Ui, npart,&s);
+      for (int m=0; m<NPAR; m++){
+	xprior[m] = xprev[NPAR*isel+m] + curand_normal(&s)*sigmat_prev;
+	cache[n+m] = xprior[m];
+      }
     }
     __syncthreads();
     /* ===================================================== */
-    
-    xastast = cache[n];
+    for (int m=0; m<NPAR; m++){
+      xprior[m] = cache[n+m];
+    }
 
     /* sample p from the uniform distribution */
 
-    cache[ithread] = model(xastast,&s);
+    cache[ithread] = model(xprior,&s);
 
     __syncthreads();
     /* ===================================================== */
@@ -78,9 +79,11 @@ extern "C"{
     if(rho<epsilon){
 
     if(ithread==0){
-    x[iblock] = xastast;
-    ntry[iblock]=cnt;
-    dist[iblock]=rho;
+      for (int m=0; m<NPAR; m++){
+	x[NPAR*iblock + m] = xprior[m];
+      }
+      ntry[iblock]=cnt;
+      dist[iblock]=rho;
     }
 
     return;
