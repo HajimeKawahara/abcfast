@@ -17,7 +17,7 @@ extern "C"{
     unsigned long id = iblock*n + ithread;
     float uni;
     int isel;
-    float xprior[NPAR];
+    float xprior[NMODEL];
     
     curand_init(seed, id, 0, &s);
 
@@ -28,8 +28,8 @@ extern "C"{
     if(cnt > MAXTRYX){
       if(ithread==0){
 	printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
-	  for (int m=0; m<NPAR; m++){
-	    x[NPAR*iblock + m] = -1.0;
+	  for (int m=0; m<NMODEL; m++){
+	    x[NMODEL*iblock + m] = -1.0;
 	  }
 	  ntry[iblock]=MAXTRYX;	  
       }
@@ -40,14 +40,14 @@ extern "C"{
     /* sampling a prior from the previous posterior*/
     if(ithread == 0){
       isel=aliasgen(Ki, Li, Ui, npart,&s);
-      for (int m=0; m<NPAR; m++){
-	xprior[m] = xprev[NPAR*isel+m] + curand_normal(&s)*sigmat_prev;
+      for (int m=0; m<NMODEL; m++){
+	xprior[m] = xprev[NMODEL*isel+m] + curand_normal(&s)*sigmat_prev;
 	cache[n+m] = xprior[m];
       }
     }
     __syncthreads();
     /* ===================================================== */
-    for (int m=0; m<NPAR; m++){
+    for (int m=0; m<NMODEL; m++){
       xprior[m] = cache[n+m];
     }
 
@@ -79,8 +79,8 @@ extern "C"{
     if(rho<epsilon){
 
     if(ithread==0){
-      for (int m=0; m<NPAR; m++){
-	x[NPAR*iblock + m] = xprior[m];
+      for (int m=0; m<NMODEL; m++){
+	x[NMODEL*iblock + m] = xprior[m];
       }
       ntry[iblock]=cnt;
       dist[iblock]=rho;

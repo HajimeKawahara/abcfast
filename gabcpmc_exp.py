@@ -22,9 +22,11 @@ if __name__ == "__main__":
     Yobs=random.exponential(1.0/lambda_true,n)
     #Ysum=np.sum(Yobs)
 
-    #start ABCpmc 
-    abc=ABCpmc(512,Yobs)
-    abc.npar=1
+    # start ABCpmc 
+    abc=ABCpmc()
+
+    # input model/prior
+    abc.nmodel=1
     abc.model=\
     """
     /* the exponential distribution model generator */
@@ -45,6 +47,11 @@ if __name__ == "__main__":
 
     }
     """
+
+    # determine the summary statistics
+    abc.nsummary = 1
+    abc.Yobs = Yobs
+    abc.n = len(Yobs)
     
     # prior functional form
     def fprior():

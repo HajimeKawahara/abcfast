@@ -13,7 +13,7 @@ extern "C"{
     int iblock = blockIdx.x;
     int ithread = threadIdx.x;
     unsigned long id = iblock*n + ithread;
-    float xprior[NPAR];
+    float xprior[NMODEL];
     
     curand_init(seed, id, 0, &s);
 
@@ -25,8 +25,8 @@ extern "C"{
 	
 	if(ithread==0){
 	  printf("EXCEED MAXTRYX. iblock=%d \n",iblock);
-	  for (int m=0; m<NPAR; m++){
-	    x[NPAR*iblock + m] = -1.0;
+	  for (int m=0; m<NMODEL; m++){
+	    x[NMODEL*iblock + m] = -1.0;
 	  }
 	ntry[iblock]=MAXTRYX;
         
@@ -37,7 +37,7 @@ extern "C"{
       /* sampling a prior from the Gamma distribution */
       if(ithread == 0){
 	prior(parprior, xprior, &s);
-	for (int m=0; m<NPAR; m++){
+	for (int m=0; m<NMODEL; m++){
 	  cache[n+m] = xprior[m];
 	}
 	
@@ -45,7 +45,7 @@ extern "C"{
       __syncthreads();
       /* ===================================================== */
       
-      for (int m=0; m<NPAR; m++){
+      for (int m=0; m<NMODEL; m++){
 	xprior[m] = cache[n+m];
       }
       
@@ -77,8 +77,8 @@ extern "C"{
       if(rho<epsilon){
 	
 	if(ithread==0){
-	  for (int m=0; m<NPAR; m++){
-	    x[NPAR*iblock + m] = xprior[m];
+	  for (int m=0; m<NMODEL; m++){
+	    x[NMODEL*iblock + m] = xprior[m];
 	  }
 	  ntry[iblock]=cnt;
 	  dist[iblock]=rho;
