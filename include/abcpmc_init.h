@@ -1,9 +1,9 @@
 /* stucture of shared memory */
 /* abcpmc_init */
-/* i=0,...,n-1, are X[i], i=n is used for a block prior (xast) */
+/* k=0,...,(n-1)*nd, are X[i,j]=X[k], k=2*i + j, k=n*nd,...,n*nd+(NMODEL-1) is used for a block prior (xast) */
 
 extern "C"{
-  __global__ void abcpmc_init(float* x, float Ysum, float epsilon, int seed, float* parprior, float* dist, int* ntry, int ptwo){
+  __global__ void abcpmc_init(float* x, float* Ysm, float epsilon, int seed, float* parprior, float* dist, int* ntry, int ptwo){
 
     curandState s;
     int cnt = 0;
@@ -14,6 +14,7 @@ extern "C"{
     int ithread = threadIdx.x;
     unsigned long id = iblock*n + ithread;
     float xprior[NMODEL];
+    float xmodel[NDATA];
     
     curand_init(seed, id, 0, &s);
 
@@ -34,7 +35,7 @@ extern "C"{
 	return;
       }
       
-      /* sampling a prior from the Gamma distribution */
+      /* sampling a prior */
       if(ithread == 0){
 	prior(parprior, xprior, &s);
 	for (int m=0; m<NMODEL; m++){
@@ -49,21 +50,24 @@ extern "C"{
 	xprior[m] = cache[n+m];
       }
       
-      /* sample p from the uniform distribution */
-      
-      cache[ithread] = model(xprior,&s);
-      
+      model(xprior, xmodel, &s);
+      for (int m=0; m<NDATA; m++){
+	cache[NDATA*ithread+m] = xmodel[m];
+      }
+	
       __syncthreads();
       /* ===================================================== */
-      
-      
-      
+
+      /* ----------------------------------------------------- */
+      /* SUMMARY STATISTICS */
+      /* sum of |X - Y|/ns */
       /* thread cooperating computation of rho */
       int i = ptwo;
-      /*int i = n/2;*/
       while(i !=0) {
         if ( ithread + i < n && ithread < i){
-	  cache[ithread] += cache[ithread + i];
+	  for (int m=0; m<NDATA; m++){
+	    cache[NDATA*ithread + m] += cache[NDATA*(ithread + i) + m];
+	  }
         }
         __syncthreads();
         i /= 2;
@@ -71,8 +75,11 @@ extern "C"{
       
       __syncthreads();
       /* ===================================================== */
-      
-      rho = abs(cache[0] - Ysum)/n;
+      rho = 0.0;
+      for (int m=0; m<NDATA; m++){
+	rho =+ abs(cache[m] - Ysm[m])/n;
+      }      
+      /* ----------------------------------------------------- */
       
       if(rho<epsilon){
 	

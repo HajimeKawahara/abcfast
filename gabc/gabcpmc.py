@@ -5,7 +5,7 @@ from pycuda.compiler import SourceModule
 from gabc.utils.statutils import *
 import sys
 
-def gabcpmc_module (model,prior,nmodel):
+def gabcpmc_module (model,prior,nmodel,ndata):
     header=\
     """
     #include <stdio.h>
@@ -16,7 +16,9 @@ def gabcpmc_module (model,prior,nmodel):
 
     extern __shared__ volatile float cache[]; 
 
-    """+"#define NMODEL "+str(nmodel)+"\n"
+    """\
+    +"#define NMODEL "+str(nmodel)+"\n"\
+    +"#define NDATA "+str(ndata)+"\n"
     
     footer=\
     """
@@ -43,18 +45,18 @@ class ABCpmc(object):
     def __init__(self):
         
         self._npart = 512  # number of the particles (default=512)
-        self.nmodel = None    # number of the model parameters 
-        self.nsummary = None # dimension of the summary statistics
-        self._n = None # dimension of data        
-        self.sv = None #summary statistics vector
-
+        self._nmodel = None    # number of the model parameters 
+        self._n = None # number of the data vector
+        self._ndata = None # dimension of the data vector
+        self._Ysm = None # summary statistics vector        
+#        self.nsm = None # dimension of the summary statistics vector
+        
         self.wide=8.0
         self.epsilon_list = False
         self.nthread_use_max=512 # maximun number of the threads in a block for use
 
         self.x,self.dev_x=setmem_device(self._npart,np.float32)
         self.xx,self.dev_xx=setmem_device(self._npart,np.float32)
-
         self.ntry,self.dev_ntry=setmem_device(self._npart,np.int32)
         self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
 
@@ -68,8 +70,9 @@ class ABCpmc(object):
         self.dev_Ki = None
         self.dev_Li = None
         self.dev_Ui = None
+        self.dev_Ysm = None
         self.seed = -1
-        
+
     @property
     def n(self):
         return self._n
@@ -78,6 +81,24 @@ class ABCpmc(object):
     def n(self,n):
         self._n = n
         self.ptwo = getptwo(self._n)
+
+    @property
+    def ndata(self):
+        return self._ndata
+
+    @ndata.setter
+    def ndata(self,ndata):
+        self._ndata = ndata
+        self.update_kernel()
+
+    @property
+    def nmodel(self):
+        return self._nmodel
+    
+    @nmodel.setter
+    def nmodel(self,nmodel):
+        self._nmodel = nmodel
+        self.update_kernel()
         
     @property
     def npart(self):
@@ -89,7 +110,6 @@ class ABCpmc(object):
             print("npart(icles)=",npart)
             sys.exit("Error: Use power of 2 as npart (# of the particles).")
         self._npart = npart
-
         
     @property
     def model(self):
@@ -120,38 +140,47 @@ class ABCpmc(object):
         cuda.memcpy_htod(self.dev_parprior,self._parprior)
         
     def update_kernel(self):        
-        if self._model is not None and self._prior is not None:
-            self.source_module=gabcpmc_module(self._model,self._prior,self.nmodel)
+        if self._model is not None \
+           and self._prior is not None\
+           and self._nmodel is not None\
+           and self._ndata is not None:
+            self.source_module=gabcpmc_module(self._model,self._prior,self._nmodel,self._ndata)
             self.pkernel_init=self.source_module.get_function("abcpmc_init")
             self.pkernel=self.source_module.get_function("abcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
+            
+    @property
+    def Ysm(self):
+        return self._Ysm
     
+    @Ysm.setter
+    def Ysm(self,Ysm):
+        self._Ysm = Ysm.astype(np.float32)
+        self.dev_Ysm = cuda.mem_alloc(self._Ysm.nbytes)        
+        cuda.memcpy_htod(self.dev_Ysm,self._Ysm)
+        print(self._Ysm)
+#        self.nsm = len(self._Ysm)
+        
     def run(self):
 
         if self.iteration == 0:
 
-            print("currently |X-Y|/n is only available for summary statistics.")
-            Ysum=np.sum(self.Yobs)
             self.epsilon=self.epsilon_list[self.iteration]
-            sharedsize=(self.n+self.nmodel)*4 #byte
-            self.pkernel_init(self.dev_x,np.float32(Ysum),np.float32(self.epsilon),np.int32(self.seed),self.dev_parprior,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
+            sharedsize=(self.n*self.ndata+self.nmodel)*4 #byte
+            self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_parprior,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
             cuda.memcpy_dtoh(self.x, self.dev_x)
             cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
 
             self.sigmat_prev = np.sqrt(self.wide*np.var(self.x))
             self.iteration = 1
-
             self.init_weight()
             
         else:
 
-            print("currently |X-Y|/n is only available for summary statistics.")
-            Ysum=np.sum(self.Yobs)
             self.epsilon=self.epsilon_list[self.iteration]
-            sharedsize=(self.n++self.nmodel)*4 #byte
-
-            self.pkernel(self.dev_xx,self.dev_x,np.float32(Ysum),np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,np.float32(self.sigmat_prev),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
+            sharedsize=(self.n*self.ndata+self.nmodel)*4 #byte
+            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,np.float32(self.sigmat_prev),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
             cuda.memcpy_dtoh(self.x, self.dev_xx)
             cuda.memcpy_dtoh(self.ntry, self.dev_ntry)

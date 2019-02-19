@@ -4,7 +4,7 @@
 
 extern "C"{
 
-  __global__ void abcpmc(float* x, float* xprev, float Ysum, float epsilon, int* Ki, int* Li, float* Ui, float sigmat_prev, int seed, float* dist, int* ntry, int ptwo){
+  __global__ void abcpmc(float* x, float* xprev, float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float sigmat_prev, int seed, float* dist, int* ntry, int ptwo){
 
     curandState s;
     int cnt = 0;
@@ -18,6 +18,7 @@ extern "C"{
     float uni;
     int isel;
     float xprior[NMODEL];
+    float xmodel[NDATA];
     
     curand_init(seed, id, 0, &s);
 
@@ -28,71 +29,76 @@ extern "C"{
     if(cnt > MAXTRYX){
       if(ithread==0){
 	printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
-	  for (int m=0; m<NMODEL; m++){
+	for (int m=0; m<NMODEL; m++){
 	    x[NMODEL*iblock + m] = -1.0;
-	  }
-	  ntry[iblock]=MAXTRYX;	  
+	}
+	ntry[iblock]=MAXTRYX;	  
       }
       return;
     }
     
-
     /* sampling a prior from the previous posterior*/
     if(ithread == 0){
       isel=aliasgen(Ki, Li, Ui, npart,&s);
       for (int m=0; m<NMODEL; m++){
 	xprior[m] = xprev[NMODEL*isel+m] + curand_normal(&s)*sigmat_prev;
-	cache[n+m] = xprior[m];
+	cache[NDATA*n+m] = xprior[m];
       }
     }
     __syncthreads();
     /* ===================================================== */
     for (int m=0; m<NMODEL; m++){
-      xprior[m] = cache[n+m];
+      xprior[m] = cache[NDATA*n+m];
     }
 
-    /* sample p from the uniform distribution */
-
-    cache[ithread] = model(xprior,&s);
-
-    __syncthreads();
-    /* ===================================================== */
-
-
-    /* SUMMARY STATISTICS (currently summation with power of 2 samples) */
-    /* thread cooperating computation of rho */        
-    /*    int i = n/2; */
-    int i = ptwo;
-    while(i !=0) {
-        if (ithread + i < n && ithread < i){
-        cache[ithread] += cache[ithread + i];
-        }
-        __syncthreads();
-        i /= 2;
-    }
-
-  __syncthreads();
-    /* ===================================================== */
-
-    rho = abs(cache[0] - Ysum)/n;
-
-    if(rho<epsilon){
-
-    if(ithread==0){
-      for (int m=0; m<NMODEL; m++){
-	x[NMODEL*iblock + m] = xprior[m];
-      }
-      ntry[iblock]=cnt;
-      dist[iblock]=rho;
-    }
-
-    return;
+    model(xprior, xmodel, &s);
+    for (int m=0; m<NDATA; m++){
+      cache[NDATA*ithread+m] = xmodel[m];
     }
 
     __syncthreads();
     /* ===================================================== */
     
-
+    /* ----------------------------------------------------- */
+    /* SUMMARY STATISTICS */
+    /* sum of |X - Y|/ns */
+    /* thread cooperating computation of rho */
+    int i = ptwo;
+    while(i !=0) {
+      if ( ithread + i < n && ithread < i){
+	for (int m=0; m<NDATA; m++){
+	  cache[NDATA*ithread + m] += cache[NDATA*(ithread + i) + m];
+	}
+      }
+        __syncthreads();
+        i /= 2;
     }
+    
+    __syncthreads();
+    /* ===================================================== */
+    rho = 0.0;
+    for (int m=0; m<NDATA; m++){
+      rho =+ abs(cache[m] - Ysm[m])/n;
+    }      
+    /* ----------------------------------------------------- */
+    
+    if(rho<epsilon){
+      
+      if(ithread==0){
+	for (int m=0; m<NMODEL; m++){
+	  x[NMODEL*iblock + m] = xprior[m];
+	}
+	ntry[iblock]=cnt;
+	dist[iblock]=rho;
+      }
+      
+      return;
     }
+    
+    __syncthreads();
+    /* ===================================================== */
+    
+    
     }
+  }
+}
