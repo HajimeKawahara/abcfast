@@ -27,7 +27,7 @@ extern "C"{
 	if(ithread==0){
 	  printf("EXCEED MAXTRYX. iblock=%d \n",iblock);
 	  for (int m=0; m<NMODEL; m++){
-	    x[NMODEL*iblock + m] = -1.0;
+	    x[NMODEL*iblock + m] = CUDART_NAN_F;
 	  }
 	ntry[iblock]=MAXTRYX;
         
@@ -38,11 +38,16 @@ extern "C"{
       /* sampling a prior */
       if(ithread == 0){
 	prior(parprior, xprior, &s);
+	
+	/*	printf("ithread=%d val=%2.8f %2.8f %2.8f %2.8f \n", ithread, xmodel[0],xmodel[1], xprior[0],xprior[1]); */
+
 	for (int m=0; m<NMODEL; m++){
 	  cache[n+m] = xprior[m];
 	}
 	
       }
+
+      
       __syncthreads();
       /* ===================================================== */
       
@@ -51,8 +56,10 @@ extern "C"{
       }
       
       model(xprior, xmodel, &s);
+
       for (int m=0; m<NDATA; m++){
 	cache[NDATA*ithread+m] = xmodel[m];
+
       }
 	
       __syncthreads();
@@ -62,11 +69,16 @@ extern "C"{
       /* SUMMARY STATISTICS */
       /* sum of |X - Y|/ns */
       /* thread cooperating computation of rho */
+
+
+
       int i = ptwo;
       while(i !=0) {
         if ( ithread + i < n && ithread < i){
 	  for (int m=0; m<NDATA; m++){
-	    cache[NDATA*ithread + m] += cache[NDATA*(ithread + i) + m];
+	    /*	    printf("ithread=%d m=%d F=%d L=%d valf=%2.8f vall=%2.8f \n", ithread, m, NDATA*ithread + m, NDATA*(ithread + i) + m, cache[NDATA*ithread + m],cache[NDATA*(ithread + i) + m]); */
+
+	    cache[NDATA*ithread + m] += cache[NDATA*(ithread + i) + m];	    
 	  }
         }
         __syncthreads();
@@ -74,6 +86,8 @@ extern "C"{
       }
       
       __syncthreads();
+
+
       /* ===================================================== */
       rho = 0.0;
       for (int m=0; m<NDATA; m++){

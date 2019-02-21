@@ -38,6 +38,8 @@ if __name__ == "__main__":
     """
     abc.prior=\
     """
+    #include "gengamma.h"
+
     __device__ void prior(float* parprior,float* xprior,curandState* s){
 
     xprior[0] = gammaf(parprior[0],parprior[1],s);

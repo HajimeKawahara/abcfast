@@ -30,7 +30,7 @@ extern "C"{
       if(ithread==0){
 	printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
 	for (int m=0; m<NMODEL; m++){
-	    x[NMODEL*iblock + m] = -1.0;
+	    x[NMODEL*iblock + m] = CUDART_NAN_F;
 	}
 	ntry[iblock]=MAXTRYX;	  
       }
@@ -61,7 +61,7 @@ extern "C"{
     
     /* ----------------------------------------------------- */
     /* SUMMARY STATISTICS */
-    /* sum of |X - Y|/ns */
+    /* sum of |X - Y|/n */
     /* thread cooperating computation of rho */
     int i = ptwo;
     while(i !=0) {
