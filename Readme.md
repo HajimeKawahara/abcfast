@@ -9,7 +9,7 @@ gabc uses header files for nvcc. set CPLUS_INCLUDE_PATH to gabc/include.
 
 ```
 
-# Algorithms
+# Examples
 
 ## ABC rejection sampling algorithm
 
@@ -27,11 +27,13 @@ ABC posterior (histogram) and analytic solutions (solid) for the binomial exampl
 
 ABC posteriors for different tolerance thresholds. The summary statistics is s=|mean(X) - mean(Y)|.
 
+- gabcpmc_norm2d.py 
+
 # Random number generators using curand_kernel.h
 
 Directory: random_gen
 
-- uniform, normal, gamma distribution, beta distribution, binomial distribution, random choise with discrete probability p_i (the alias method).
+- uniform, normal, 2D normal, gamma distribution, beta distribution, binomial distribution, random choise with discrete probability p_i (the alias method).
 
 # Customizing ABC-PMC
 
