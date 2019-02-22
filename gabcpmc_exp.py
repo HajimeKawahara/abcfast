@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     # start ABCpmc 
     abc=ABCpmc()
-    abc.maxtryx=1000000#debug magic
+    abc.maxtryx=10000000#debug magic
     abc.npart=512#debug magic
 
     # input model/prior
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     
     #set prior parameters
     abc.parprior=np.array([0.1,0.1]) #alpha, beta
-    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2,1.e-3,1.e-4])
+    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
 
     #initial run of abc pmc
     abc.run()
@@ -78,6 +78,9 @@ if __name__ == "__main__":
         abc.run()
         abc.check()
 
+    tend = time.time()
+    print(tend-tstart,"sec")
+    
     #plotting...
     plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
     alpha=abc.parprior[0]+abc.n
