@@ -4,7 +4,7 @@
 
 extern "C"{
 
-  __global__ void abcpmc(float* x, float* xprev, float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float* invcov, int seed, float* dist, int* ntry, int ptwo){
+  __global__ void abcpmc(float* x, float* xprev, float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float* Qmat, float* invcov, int seed, float* dist, int* ntry, int ptwo){
 
     curandState s;
     int cnt = 0;
@@ -19,6 +19,7 @@ extern "C"{
     int isel;
     float xprior[NMODEL];
     float xmodel[NDATA];
+    float rn[NMODEL];
     
     curand_init(seed, id, 0, &s);
 
@@ -41,7 +42,23 @@ extern "C"{
     if(ithread == 0){
       isel=aliasgen(Ki, Li, Ui, npart,&s);
       for (int m=0; m<NMODEL; m++){
+	rn[m] = curand_normal(&s);
+      }
+
+      for (int m=0; m<NMODEL; m++){
+	/* xprior[m] = xprev[NMODEL*isel+m] + curand_normal(&s)/sqrt(invcov[m]); */
+	xprior[m]=xprev[NMODEL*isel+m];
+	
+	for (int k=0; k<NMODEL; k++){
+	  /* xprior[m] = e11*rn1 + e21*rn2 + xprev[NMODEL*isel+m]; */
+	  /*	  xprior[m]=+Qmat[m*NMODEL+k]*rn[k]; */
+	  /* SHOULD CHECK */
+	  xprior[m]=+Qmat[k*NMODEL+m]*rn[k];
+	}
+
 	xprior[m] = xprev[NMODEL*isel+m] + curand_normal(&s)/sqrt(invcov[m]);
+
+	
 	cache[NDATA*n+m] = xprior[m];
       }
     }

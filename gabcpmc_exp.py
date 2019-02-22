@@ -23,6 +23,8 @@ if __name__ == "__main__":
 
     # start ABCpmc 
     abc=ABCpmc()
+    abc.maxtryx=100000#debug magic
+    abc.npart=512#debug magic
 
     # input model/prior
     abc.nmodel=1

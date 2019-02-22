@@ -67,6 +67,8 @@ class ABCpmc(object):
         self.dev_dist=None
         self.invcov = None
         self.dev_invcov = None
+        self.Qmat = None
+        self.dev_Qmat = None
         
         self.iteration = 0
         self.epsilon = None
@@ -79,6 +81,7 @@ class ABCpmc(object):
         self.dev_Li = None
         self.dev_Ui = None
         self.dev_Ysm = None
+
         self.seed = -1
 
     @property
@@ -162,7 +165,8 @@ class ABCpmc(object):
             self.xx,self.dev_xx=setmem_device(self._npart*self._nmodel,np.float32)
             self.ntry,self.dev_ntry=setmem_device(self._npart,np.int32)
             self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
-            self.invcov,self.dev_invcov=setmem_device(self._nmodel,np.float32)
+            self.invcov,self.dev_invcov=setmem_device(self._nmodel*self._nmodel,np.float32)
+            self.Qmat,self.dev_Qmat=setmem_device(self._nmodel*self._nmodel,np.float32)
             
     @property
     def Ysm(self):
@@ -197,7 +201,7 @@ class ABCpmc(object):
 
             self.epsilon=self.epsilon_list[self.iteration]
             sharedsize=(self._n*self._ndata+self._nmodel)*4 #byte
-            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_invcov,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
+            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,self.dev_invcov,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
             cuda.memcpy_dtoh(self.x, self.dev_xx)
             cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
@@ -206,7 +210,6 @@ class ABCpmc(object):
             self.update_invcov()
             #update weight
             self.update_weight()
-            
             #swap
             self.dev_x, self.dev_xx = self.dev_xx, self.dev_x
             self.dev_w, self.dev_ww = self.dev_ww, self.dev_w
@@ -235,11 +238,24 @@ class ABCpmc(object):
 
     def update_invcov(self):
         #self.sigmat_prev = np.sqrt(self.wide*np.var(self.x))
-        xw=np.copy(self.x).reshape(self._npart,self._nmodel)                        
-        self.invcov = (1.0/(self.wide*np.var(xw[:,:],axis=0))).astype(np.float32)
-        print("Warning: Currently only diagonal component of covariance is used. ")
-        print("INVCOV=",self.invcov)        
+        xw=np.copy(self.x).reshape(self._npart,self._nmodel).transpose()
+        cov = self.wide*np.cov(xw,bias=True)
+        
+        #inverse covariance matrix
+        if self._nmodel == 1:
+            self.invcov = np.array(1.0/cov).astype(np.float32)
+            self.Qmat = np.array([np.sqrt(cov)]).astype(np.float32)
+        else:
+            self.invcov = (np.linalg.inv(cov).flatten()).astype(np.float32)
+            # Q matrix for multivariate Gaussian prior sampler
+            [eigenvalues, eigenvectors] = np.linalg.eig(cov)
+            l = np.matrix(np.diag(np.sqrt(eigenvalues)))
+            Q = np.matrix(eigenvectors) * l
+            self.Qmat=(Q.flatten()).astype(np.float32)
+
         cuda.memcpy_htod(self.dev_invcov,self.invcov)
+        cuda.memcpy_htod(self.dev_Qmat,self.Qmat)
+        
 
         
     def update_weight(self):

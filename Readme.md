@@ -5,7 +5,7 @@ GPU Approximate Baysian Computation. Under development.
 gabc uses header files for nvcc. set CPLUS_INCLUDE_PATH to gabc/include.
 
 ```
- setenv CPLUS_INCLUDE_PATH /../../exoabc/include
+ setenv CPLUS_INCLUDE_PATH abcfast/include
 
 ```
 
