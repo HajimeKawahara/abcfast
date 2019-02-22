@@ -1,6 +1,6 @@
     extern "C"{
 
-      __global__ void compute_weight(float* wnew, float* wprev, float* xnew, float* xprev, float sigmat_prev){
+      __global__ void compute_weight(float* wnew, float* wprev, float* xnew, float* xprev, float* invcov){
     int nthread = blockDim.x;
     int npart = gridDim.x;
     float rnthread = float(nthread);
@@ -19,7 +19,11 @@
 
     ipart = m*nthread+ithread;
     /* computing qf (Gaussian transition kernel) */
-    qf = exp(-pow((xprev[ipart] - xnew[iblock]),2)/(2.0*pow(sigmat_prev,2)));
+    qf=0.0;
+    for (int m=0; m<NMODEL; m++){
+      qf =+ -0.5*pow((xprev[NMODEL*ipart + m] - xnew[NMODEL*iblock + m]),2)/invcov[m];
+	}
+    qf = exp(qf);
     /* thread cooperating computation of a denominater */        
     cache[ipart] = wprev[ipart]*qf;
 

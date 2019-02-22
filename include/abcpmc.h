@@ -4,7 +4,7 @@
 
 extern "C"{
 
-  __global__ void abcpmc(float* x, float* xprev, float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float sigmat_prev, int seed, float* dist, int* ntry, int ptwo){
+  __global__ void abcpmc(float* x, float* xprev, float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float* invcov, int seed, float* dist, int* ntry, int ptwo){
 
     curandState s;
     int cnt = 0;
@@ -41,7 +41,7 @@ extern "C"{
     if(ithread == 0){
       isel=aliasgen(Ki, Li, Ui, npart,&s);
       for (int m=0; m<NMODEL; m++){
-	xprior[m] = xprev[NMODEL*isel+m] + curand_normal(&s)*sigmat_prev;
+	xprior[m] = xprev[NMODEL*isel+m] + curand_normal(&s)/sqrt(invcov[m]);
 	cache[NDATA*n+m] = xprior[m];
       }
     }

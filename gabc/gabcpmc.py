@@ -65,6 +65,8 @@ class ABCpmc(object):
         self.dev_ntry=None
         self.dist=None
         self.dev_dist=None
+        self.invcov = None
+        self.dev_invcov = None
         
         self.iteration = 0
         self.epsilon = None
@@ -72,7 +74,7 @@ class ABCpmc(object):
         self._prior = None
         self._parprior = None
         self._dev_parprior = None
-        self.sigmat_prev = None
+
         self.dev_Ki = None
         self.dev_Li = None
         self.dev_Ui = None
@@ -160,6 +162,7 @@ class ABCpmc(object):
             self.xx,self.dev_xx=setmem_device(self._npart*self._nmodel,np.float32)
             self.ntry,self.dev_ntry=setmem_device(self._npart,np.int32)
             self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
+            self.invcov,self.dev_invcov=setmem_device(self._nmodel,np.float32)
             
     @property
     def Ysm(self):
@@ -184,21 +187,26 @@ class ABCpmc(object):
             cuda.memcpy_dtoh(self.x, self.dev_x)
             cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
 
-            self.sigmat_prev = np.sqrt(self.wide*np.var(self.x))
-            self.iteration = 1
+            #update covariance
+            self.update_invcov()
+            #update weight
             self.init_weight()
+            self.iteration = 1
             
         else:
 
             self.epsilon=self.epsilon_list[self.iteration]
             sharedsize=(self._n*self._ndata+self._nmodel)*4 #byte
-            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,np.float32(self.sigmat_prev),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
+            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_invcov,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
             cuda.memcpy_dtoh(self.x, self.dev_xx)
             cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
-            self.sigmat_prev = np.sqrt(self.wide*np.var(self.x))
+
+            #update covariance
+            self.update_invcov()
             #update weight
             self.update_weight()
+            
             #swap
             self.dev_x, self.dev_xx = self.dev_xx, self.dev_x
             self.dev_w, self.dev_ww = self.dev_ww, self.dev_w
@@ -225,12 +233,21 @@ class ABCpmc(object):
         cuda.memcpy_htod(self.dev_Li,Li)
         cuda.memcpy_htod(self.dev_Ui,Ui)
 
+    def update_invcov(self):
+        #self.sigmat_prev = np.sqrt(self.wide*np.var(self.x))
+        xw=np.copy(self.x).reshape(self._npart,self._nmodel)                        
+        self.invcov = (1.0/(self.wide*np.var(xw[:,:],axis=0))).astype(np.float32)
+        print("Warning: Currently only diagonal component of covariance is used. ")
+        print("INVCOV=",self.invcov)        
+        cuda.memcpy_htod(self.dev_invcov,self.invcov)
+
+        
     def update_weight(self):
         #update weight
         sharedsize=int(self._npart*4) #byte
         nthread=min(self._npart,self.nthread_use_max)
         
-        self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, np.float32(self.sigmat_prev), block=(int(nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+        self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, self.dev_invcov, block=(int(nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
         cuda.memcpy_dtoh(self.w, self.dev_ww)
         #

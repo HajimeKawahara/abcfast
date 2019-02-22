@@ -18,8 +18,8 @@ __device__ void gennorm2df(float* x,float* parprior, curandState* s){
   float rn2 = curand_normal(s);
 
   if(c==0.0){
-    x[0] = a*rn1 + mu0;
-    x[1] = b*rn2 + mu1;
+    x[0] = rn1*sqrt(a) + mu0;
+    x[1] = rn2*sqrt(b) + mu1;
 
   }else{
     float a2 = pow(a,2);
