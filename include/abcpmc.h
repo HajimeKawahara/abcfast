@@ -4,7 +4,7 @@
 
 extern "C"{
 
-  __global__ void abcpmc(float* x, float* xprev, float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float* Qmat, float* invcov, int seed, float* dist, int* ntry, int ptwo){
+  __global__ void abcpmc(float* x, float* xprev, float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float* Qmat, int seed, float* dist, int* ntry, int ptwo){
 
     curandState s;
     int cnt = 0;
@@ -46,18 +46,11 @@ extern "C"{
       }
 
       for (int m=0; m<NMODEL; m++){
-	/* xprior[m] = xprev[NMODEL*isel+m] + curand_normal(&s)/sqrt(invcov[m]); */
 	xprior[m]=xprev[NMODEL*isel+m];
 	
 	for (int k=0; k<NMODEL; k++){
-	  /* xprior[m] = e11*rn1 + e21*rn2 + xprev[NMODEL*isel+m]; */
-	  /*	  xprior[m]=+Qmat[m*NMODEL+k]*rn[k]; */
-	  /* SHOULD CHECK */
-	  xprior[m]=+Qmat[k*NMODEL+m]*rn[k];
+	  xprior[m] += Qmat[m*NMODEL+k]*rn[k];
 	}
-
-	xprior[m] = xprev[NMODEL*isel+m] + curand_normal(&s)/sqrt(invcov[m]);
-
 	
 	cache[NDATA*n+m] = xprior[m];
       }
@@ -95,8 +88,9 @@ extern "C"{
     /* ===================================================== */
     rho = 0.0;
     for (int m=0; m<NDATA; m++){
-      rho =+ abs(cache[m] - Ysm[m])/n;
-    }      
+      rho += abs(cache[m] - Ysm[m])/n;     
+    }
+
     /* ----------------------------------------------------- */
     
     if(rho<epsilon){

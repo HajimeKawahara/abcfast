@@ -7,7 +7,7 @@ import pycuda.driver as cuda
 import pycuda.compiler
 from pycuda.compiler import SourceModule
 
-def gabcrm_module ():
+def norm2d_module ():
     source_module = SourceModule("""
 
     #include <curand_kernel.h>
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     dev_x2 = cuda.mem_alloc(x2.nbytes)
     cuda.memcpy_htod(dev_x2,x2)
 
-    source_module=gabcrm_module()
+    source_module=norm2d_module()
     pkernel=source_module.get_function("norm2d")
     pkernel(dev_x1,dev_x2,np.float32(a),np.float32(b),np.float32(c),block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
     cuda.memcpy_dtoh(x1, dev_x1)

@@ -27,7 +27,9 @@ ABC posterior (histogram) and analytic solutions (solid) for the binomial exampl
 
 ABC posteriors for different tolerance thresholds. The summary statistics is s=|mean(X) - mean(Y)|.
 
-- gabcpmc_norm2d.py 
+- gabcpmc_norm2d.py demonstrating a 2D gaussian case, inspired from 2d_gauss example in [abcpmc](https://github.com/jakeret/abcpmc) package by Akeret et al. 
+
+<img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/abcpmc_norm2d.png" Titie="explanation" Width=450px>
 
 # Random number generators using curand_kernel.h
 

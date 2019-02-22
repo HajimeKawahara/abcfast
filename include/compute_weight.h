@@ -15,17 +15,27 @@
     int ithread = threadIdx.x;
     float qf;
     
-    for (int m=0; m<npart/nthread; m++){
+    for (int l=0; l<npart/nthread; l++){
 
-    ipart = m*nthread+ithread;
-    /* computing qf (Gaussian transition kernel) */
-    qf=0.0;
-    for (int m=0; m<NMODEL; m++){
-      qf =+ -0.5*pow((xprev[NMODEL*ipart + m] - xnew[NMODEL*iblock + m]),2)/invcov[m];
+      ipart = l*nthread+ithread;
+      /* computing qf (Gaussian transition kernel) */
+      qf=0.0;
+      for (int m=0; m<NMODEL; m++){
+	for (int k=0; k<NMODEL; k++){
+	  /* [NMODEL*ipart + m] - xnew[NMODEL*iblock + m] */
+	  /* xprev: ipart,imodel => NMODEL*ipart + imodel  */
+	  /* xnew: iblock,imodel => NMODEL*iblock + imodel  */
+	  /* imodel = m,k  */
+	  /* here, computing an element of a quadratic form x_m x_k A_mk */
+	  /* A_mk := m*NMODEL + k = k*NMODEL + m because inverse covariance matrix is a symmetric matrix */
+
+	  qf += (xprev[NMODEL*ipart + m] - xnew[NMODEL*iblock + m])*(xprev[NMODEL*ipart + k] - xnew[NMODEL*iblock + k])/invcov[m*NMODEL + k];
+	  
 	}
-    qf = exp(qf);
-    /* thread cooperating computation of a denominater */        
-    cache[ipart] = wprev[ipart]*qf;
+      }
+      qf = exp(-0.5*qf);
+      /* thread cooperating computation of a denominater */        
+      cache[ipart] = wprev[ipart]*qf;
 
     }
     __syncthreads();

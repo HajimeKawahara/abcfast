@@ -58,6 +58,7 @@ class ABCpmc(object):
         self.nthread_use_max=512 # maximun number of the threads in a block for use
 
         self.x=None
+        self.xw = None #(npart,nmodel)-dimension array type of x
         self.dev_x=None
         self.xx=None
         self.dev_xx=None
@@ -190,6 +191,9 @@ class ABCpmc(object):
 
             cuda.memcpy_dtoh(self.x, self.dev_x)
             cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
+            
+            self.xw=np.copy(self.x).reshape(self._npart,self._nmodel)
+            print("shape of xw",np.shape(self.xw))
 
             #update covariance
             self.update_invcov()
@@ -201,10 +205,13 @@ class ABCpmc(object):
 
             self.epsilon=self.epsilon_list[self.iteration]
             sharedsize=(self._n*self._ndata+self._nmodel)*4 #byte
-            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,self.dev_invcov,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
+            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
             cuda.memcpy_dtoh(self.x, self.dev_xx)
             cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
+            
+            self.xw=np.copy(self.x).reshape(self._npart,self._nmodel)
+            print("shape of xw",np.shape(self.xw))
 
             #update covariance
             self.update_invcov()
@@ -237,9 +244,7 @@ class ABCpmc(object):
         cuda.memcpy_htod(self.dev_Ui,Ui)
 
     def update_invcov(self):
-        #self.sigmat_prev = np.sqrt(self.wide*np.var(self.x))
-        xw=np.copy(self.x).reshape(self._npart,self._nmodel).transpose()
-        cov = self.wide*np.cov(xw,bias=True)
+        cov = self.wide*np.cov(self.xw.transpose(),bias=True)
         
         #inverse covariance matrix
         if self._nmodel == 1:
@@ -256,7 +261,6 @@ class ABCpmc(object):
         cuda.memcpy_htod(self.dev_invcov,self.invcov)
         cuda.memcpy_htod(self.dev_Qmat,self.Qmat)
         
-
         
     def update_weight(self):
         #update weight
@@ -266,9 +270,12 @@ class ABCpmc(object):
         self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, self.dev_invcov, block=(int(nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
         cuda.memcpy_dtoh(self.w, self.dev_ww)
-        #
-        pri=self.fprior(self.x, self.parprior)
-        #
+
+        if self._nmodel == 1:            
+            pri=self.fprior(self.x, self.parprior)
+        else:
+            pri=self.fprior(self.xw, self.parprior)
+    
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
         self.w=self.w.astype(np.float32)
