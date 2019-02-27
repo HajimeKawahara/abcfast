@@ -41,8 +41,14 @@ Directory: random_gen
 
 You need to prepare
 
-- model: data sampler with given model parameters
-- prior: random number generator from a prior distribution
-- fprior: a prior density distribution
+- model: data sampler with given model parameters,
+
+Ysim(NDATA) ~ model( parmodel(NMODEL) )
+
+- prior: random number generator from a prior distribution,
+
+parmodel(NMODEL) ~ prior( parprior(NPRIOR) )
+
+- fprior: a prior density distribution to compute weights
 
 This code is in the beta stage (very unstable). Ask [Hajime Kawahara](http://secondearths.sakura.ne.jp/en/index.html) for more details.
