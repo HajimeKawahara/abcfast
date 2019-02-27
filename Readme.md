@@ -6,7 +6,6 @@ gabc uses header files for nvcc. set CPLUS_INCLUDE_PATH to gabc/include.
 
 ```
  setenv CPLUS_INCLUDE_PATH abcfast/include
-
 ```
 
 # Examples
@@ -41,14 +40,15 @@ Directory: random_gen
 
 You need to prepare
 
-- model: data sampler with given model parameters,
+### model
+data sampler with given model parameters, **Ysim(NDATA) ~ model( parmodel(NMODEL) )**,
+c based or prepared python function
 
-Ysim(NDATA) ~ model( parmodel(NMODEL) )
+### prior
+random number generator from a prior distribution, **parmodel(NMODEL) ~ prior( parprior(NPRIOR) )**, 
+c based or prepared python function  
 
-- prior: random number generator from a prior distribution,
-
-parmodel(NMODEL) ~ prior( parprior(NPRIOR) )
-
-- fprior: a prior density distribution to compute weights
+### fprior
+a prior density distribution to compute weights, python function
 
 This code is in the beta stage (very unstable). Ask [Hajime Kawahara](http://secondearths.sakura.ne.jp/en/index.html) for more details.
