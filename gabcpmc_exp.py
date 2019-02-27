@@ -17,9 +17,9 @@ if __name__ == "__main__":
     print("*******************************************")
 
     #preparing data
-    n=500
+    nsample=500
     lambda_true=0.1
-    Yobs=random.exponential(1.0/lambda_true,n)
+    Yobs=random.exponential(1.0/lambda_true,nsample)
 
     # start ABCpmc 
     abc=ABCpmc()
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     """
 
     # data and the summary statistics
-    abc.n = len(Yobs)
+    abc.nsample = len(Yobs)
     abc.ndata = 1
     Ysum = np.sum(Yobs)
     abc.Ysm = np.array([Ysum])
@@ -72,7 +72,6 @@ if __name__ == "__main__":
     abc.run()
     abc.check()
     plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
         abc.run()
@@ -83,7 +82,7 @@ if __name__ == "__main__":
     
     #plotting...
     plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    alpha=abc.parprior[0]+abc.n
+    alpha=abc.parprior[0]+abc.nsample
     beta=abc.parprior[1]+Ysum
     xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")

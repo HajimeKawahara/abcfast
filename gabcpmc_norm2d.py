@@ -19,16 +19,16 @@ if __name__ == "__main__":
 
     
     #data
-    n=1000
+    nsample=1000
     sigma = np.eye(2) * 0.25
     means = [1.1, 1.5]
-    Yobs=random.multivariate_normal(means, sigma, n)
+    Yobs=random.multivariate_normal(means, sigma, nsample)
 
     #start ABCpmc 
     abc=ABCpmc()
 
     abc.maxtryx=1000000#debug magic
-    abc.npart=512*4#debug magic
+    abc.npart=512#debug magic
     
     # input model/prior
     abc.nmodel=2 #number of the model parameter = 2: (mean0, mean1)
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     """
 
     # data and the summary statistics
-    abc.n = len(Yobs)
+    abc.nsample = len(Yobs)
     abc.ndata = 2 #data dimension
     Ysum = np.sum(Yobs,axis=0)
     abc.Ysm = Ysum
@@ -82,6 +82,7 @@ if __name__ == "__main__":
     abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.05])
 
     #initial run of abc pmc
+    abc.check_preparation()
     abc.run()
     abc.check()
     xw0=np.copy(abc.xw)

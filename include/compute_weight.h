@@ -1,4 +1,4 @@
-    extern "C"{
+extern "C"{
 
       __global__ void compute_weight(float* wnew, float* wprev, float* xnew, float* xprev, float* invcov){
     int nthread = blockDim.x;

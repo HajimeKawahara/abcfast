@@ -5,9 +5,12 @@ from pycuda.compiler import SourceModule
 from gabc.utils.statutils import *
 import sys
 
-def gabcpmc_module (model,prior,nmodel,ndata,maxtryx=10000000):
+def gabcpmc_module (model,prior,nmodel,ndata,nsample,maxtryx=10000000):
     header=\
-    "#define MAXTRYX "+str(maxtryx)+"\n"\
+    "    #define NMODEL "+str(nmodel)+"\n"\
+    +"    #define NDATA "+str(ndata)+"\n"\
+    +"    #define NSAMPLE "+str(nsample)+"\n"\
+    +"    #define MAXTRYX "+str(maxtryx)+"\n"\
     +"""
     #define CUDART_NAN_F __int_as_float(0x7fffffff)
     #include <stdio.h>
@@ -17,8 +20,6 @@ def gabcpmc_module (model,prior,nmodel,ndata,maxtryx=10000000):
     extern __shared__ volatile float cache[]; 
 
     """\
-    +"#define NMODEL "+str(nmodel)+"\n"\
-    +"#define NDATA "+str(ndata)+"\n"
     
     footer=\
     """
@@ -45,13 +46,16 @@ class ABCpmc(object):
     def __init__(self):
 
         self.maxtryx = 10000000 #MAXTRYX reduce this value when you debug the code.
-        
+        self.nthread_max = 1024 #MAX NUMBER OF THREADS IN A BLOCK
+
         self._npart = 512  # number of the particles (default=512)
         self._nmodel = None    # number of the model parameters 
-        self._n = None # number of the data vector
+        self._nsample = None # number of the data vector
         self._ndata = None # dimension of the data vector
         self._Ysm = None # summary statistics vector        
-#        self.nsm = None # dimension of the summary statistics vector
+        self.nthread = None #number of threads    
+
+        #        self.nsm = None # dimension of the summary statistics vector
         
         self.wide=8.0
         self.epsilon_list = False
@@ -84,15 +88,7 @@ class ABCpmc(object):
         self.dev_Ysm = None
 
         self.seed = -1
-
-    @property
-    def n(self):
-        return self._n
-
-    @n.setter
-    def n(self,n):
-        self._n = n
-        self.ptwo = getptwo(self._n)
+        self.prepare = False
 
     @property
     def ndata(self):
@@ -103,6 +99,17 @@ class ABCpmc(object):
         self._ndata = ndata
         self.update_kernel()
 
+    @property
+    def nsample(self):
+        return self._nsample
+
+    @nsample.setter
+    def nsample(self,nsample):
+        self._nsample = nsample
+        self.ptwo = getptwo(self._nsample)
+        self.update_kernel()
+
+        
     @property
     def nmodel(self):
         return self._nmodel
@@ -155,9 +162,10 @@ class ABCpmc(object):
     def update_kernel(self):        
         if self._model is not None \
            and self._prior is not None and self._npart is not None \
-           and self._nmodel is not None and self._ndata is not None:
+           and self._nmodel is not None and self._ndata is not None \
+           and self._nsample is not None:
             
-            self.source_module=gabcpmc_module(self._model,self._prior,self._nmodel,self._ndata,maxtryx=self.maxtryx)
+            self.source_module=gabcpmc_module(self._model,self._prior,self._nmodel,self._ndata,self._nsample,maxtryx=self.maxtryx)
             self.pkernel_init=self.source_module.get_function("abcpmc_init")
             self.pkernel=self.source_module.get_function("abcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
@@ -168,6 +176,8 @@ class ABCpmc(object):
             self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
             self.invcov,self.dev_invcov=setmem_device(self._nmodel*self._nmodel,np.float32)
             self.Qmat,self.dev_Qmat=setmem_device(self._nmodel*self._nmodel,np.float32)
+            self.nthread = min(self.nthread_max,self._nsample)
+            self.prepare = True
             
     @property
     def Ysm(self):
@@ -178,23 +188,18 @@ class ABCpmc(object):
         self._Ysm = Ysm.astype(np.float32)
         self.dev_Ysm = cuda.mem_alloc(self._Ysm.nbytes)        
         cuda.memcpy_htod(self.dev_Ysm,self._Ysm)
-        print(self._Ysm)
 #        self.nsm = len(self._Ysm)
         
     def run(self):
-
+        
         if self.iteration == 0:
 
             self.epsilon=self.epsilon_list[self.iteration]
-            sharedsize=(self._n*self._ndata+self._nmodel)*4 #byte
-            self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_parprior,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
+            sharedsize=(self._nsample*self._ndata+self._nmodel)*4 #byte
+            self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_parprior,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
             cuda.memcpy_dtoh(self.x, self.dev_x)
-            cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
             
-            self.xw=np.copy(self.x).reshape(self._npart,self._nmodel)
-            print("shape of xw",np.shape(self.xw))
-
             #update covariance
             self.update_invcov()
             #update weight
@@ -204,15 +209,11 @@ class ABCpmc(object):
         else:
 
             self.epsilon=self.epsilon_list[self.iteration]
-            sharedsize=(self._n*self._ndata+self._nmodel)*4 #byte
-            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.n),1,1), grid=(int(self._npart),1),shared=sharedsize)
+            sharedsize=(self._nsample*self._ndata+self._nmodel)*4 #byte
+            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
             cuda.memcpy_dtoh(self.x, self.dev_xx)
-            cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
             
-            self.xw=np.copy(self.x).reshape(self._npart,self._nmodel)
-            print("shape of xw",np.shape(self.xw))
-
             #update covariance
             self.update_invcov()
             #update weight
@@ -223,6 +224,7 @@ class ABCpmc(object):
             self.iteration = self.iteration + 1
             
     def check(self):
+        cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
         FR=len(self.x[self.x!=self.x])/len(self.x)
         print("#"+str(self.iteration-1)+":","epsilon=",self.epsilon,"Fail Rate=",FR)
         if FR>0:
@@ -244,13 +246,15 @@ class ABCpmc(object):
         cuda.memcpy_htod(self.dev_Ui,Ui)
 
     def update_invcov(self):
-        cov = self.wide*np.cov(self.xw.transpose(),bias=True)
         
         #inverse covariance matrix
         if self._nmodel == 1:
+            cov = self.wide*np.var(self.x)
             self.invcov = np.array(1.0/cov).astype(np.float32)
             self.Qmat = np.array([np.sqrt(cov)]).astype(np.float32)
         else:
+            self.xw=np.copy(self.x).reshape(self._npart,self._nmodel)
+            cov = self.wide*np.cov(self.xw.transpose(),bias=True)
             self.invcov = (np.linalg.inv(cov).flatten()).astype(np.float32)
             # Q matrix for multivariate Gaussian prior sampler
             [eigenvalues, eigenvectors] = np.linalg.eig(cov)
@@ -285,4 +289,24 @@ class ABCpmc(object):
         cuda.memcpy_htod(self.dev_Ui,Ui)
 
 
-    
+    def check_preparation(self):
+        if not self.prepare:
+            print("Error: parameter setting is imcomplete:")
+            if self._model is None:
+                print("SET .model")
+            if self._prior is None:
+                print("SET .prior")
+            if self._npart is None:
+                print("SET .npart (# of the particles)")
+            if self._nmodel is None:
+                print("SET .nmodel (# of the model parameters)")
+            if self._ndata is None:
+                print("SET .ndata (# of the output parameters of the model)")
+            if self._nsample is None:
+                print("SET .nsample (# of the samples)")            
+            sys.exit()
+
+        if self._Ysm is None:
+            print("SET .Ysm (summary statistics of data)")
+            sys.exit()
+            

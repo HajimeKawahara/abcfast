@@ -10,13 +10,14 @@ extern "C"{
     int cnt = 0;
     float p;
     float rho;
-    int n = blockDim.x;
+    int nthread = blockDim.x;
     int npart = gridDim.x;
     int iblock = blockIdx.x;
     int ithread = threadIdx.x;
-    unsigned long id = iblock*n + ithread;
+    unsigned long id = iblock*NSAMPLE + ithread;
     float uni;
     int isel;
+    int isample;
     float xprior[NMODEL];
     float xmodel[NDATA];
     float rn[NMODEL];
@@ -29,7 +30,7 @@ extern "C"{
     cnt++;
     if(cnt > MAXTRYX){
       if(ithread==0){
-	printf("EXCEED MAXTRYX. iblock=%d \\n",iblock);
+	printf("EXCEED MAXTRYX. iblock=%d \n",iblock);
 	for (int m=0; m<NMODEL; m++){
 	    x[NMODEL*iblock + m] = CUDART_NAN_F;
 	}
@@ -52,18 +53,21 @@ extern "C"{
 	  xprior[m] += Qmat[m*NMODEL+k]*rn[k];
 	}
 	
-	cache[NDATA*n+m] = xprior[m];
+	cache[NDATA*NSAMPLE+m] = xprior[m];
       }
     }
     __syncthreads();
     /* ===================================================== */
     for (int m=0; m<NMODEL; m++){
-      xprior[m] = cache[NDATA*n+m];
+      xprior[m] = cache[NDATA*NSAMPLE+m];
     }
 
-    model(xprior, xmodel, &s);
-    for (int m=0; m<NDATA; m++){
-      cache[NDATA*ithread+m] = xmodel[m];
+    for (int p=0; p<int(float(NSAMPLE-1)/float(nthread))+1; p++){
+      isample = p*nthread + ithread;
+      model(xprior, xmodel, &s);
+      for (int m=0; m<NDATA; m++){
+	cache[NDATA*isample+m] = xmodel[m];
+      }
     }
 
     __syncthreads();
@@ -75,11 +79,17 @@ extern "C"{
     /* thread cooperating computation of rho */
     int i = ptwo;
     while(i !=0) {
-      if ( ithread + i < n && ithread < i){
-	for (int m=0; m<NDATA; m++){
-	  cache[NDATA*ithread + m] += cache[NDATA*(ithread + i) + m];
+
+      for (int p=0; p<int(float(NSAMPLE-1)/float(nthread))+1; p++){
+	isample = p*nthread + ithread;
+	
+	if ( isample + i < NSAMPLE && ithread < i){
+	  for (int m=0; m<NDATA; m++){
+	    cache[NDATA*isample + m] += cache[NDATA*(isample + i) + m];
+	  }
 	}
       }
+      
         __syncthreads();
         i /= 2;
     }
@@ -88,7 +98,7 @@ extern "C"{
     /* ===================================================== */
     rho = 0.0;
     for (int m=0; m<NDATA; m++){
-      rho += abs(cache[m] - Ysm[m])/n;     
+      rho += abs(cache[m] - Ysm[m])/NSAMPLE;     
     }
 
     /* ----------------------------------------------------- */
