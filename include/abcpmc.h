@@ -18,8 +18,8 @@ extern "C"{
     float uni;
     int isel;
     int isample;
-    float xprior[NMODEL];
-    float xmodel[NDATA];
+    float parmodel[NMODEL];
+    float Ysim[NDATA];
     float rn[NMODEL];
     
     curand_init(seed, id, 0, &s);
@@ -47,26 +47,26 @@ extern "C"{
       }
 
       for (int m=0; m<NMODEL; m++){
-	xprior[m]=xprev[NMODEL*isel+m];
+	parmodel[m]=xprev[NMODEL*isel+m];
 	
 	for (int k=0; k<NMODEL; k++){
-	  xprior[m] += Qmat[m*NMODEL+k]*rn[k];
+	  parmodel[m] += Qmat[m*NMODEL+k]*rn[k];
 	}
 	
-	cache[NDATA*NSAMPLE+m] = xprior[m];
+	cache[NDATA*NSAMPLE+m] = parmodel[m];
       }
     }
     __syncthreads();
     /* ===================================================== */
     for (int m=0; m<NMODEL; m++){
-      xprior[m] = cache[NDATA*NSAMPLE+m];
+      parmodel[m] = cache[NDATA*NSAMPLE+m];
     }
 
     for (int p=0; p<int(float(NSAMPLE-1)/float(nthread))+1; p++){
       isample = p*nthread + ithread;
-      model(xprior, xmodel, &s);
+      model(parmodel, Ysim, &s);
       for (int m=0; m<NDATA; m++){
-	cache[NDATA*isample+m] = xmodel[m];
+	cache[NDATA*isample+m] = Ysim[m];
       }
     }
 
@@ -107,7 +107,7 @@ extern "C"{
       
       if(ithread==0){
 	for (int m=0; m<NMODEL; m++){
-	  x[NMODEL*iblock + m] = xprior[m];
+	  x[NMODEL*iblock + m] = parmodel[m];
 	}
 	ntry[iblock]=cnt;
 	dist[iblock]=rho;

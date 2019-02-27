@@ -38,10 +38,10 @@ if __name__ == "__main__":
 
     /* the exponential distribution model generator */
 
-    __device__ float model(float* par, float* xmodel, curandState* s){
+    __device__ float model(float* parmodel, float* Ysim, curandState* s){
 
-    xmodel[0] = gennormf(par[0],0.25,s);
-    xmodel[1] = gennormf(par[1],0.25,s);
+    Ysim[0] = gennormf(parmodel[0],0.25,s);
+    Ysim[1] = gennormf(parmodel[1],0.25,s);
 
     }
     """
@@ -50,10 +50,10 @@ if __name__ == "__main__":
     abc.prior=\
     """
 
-    __device__ void prior(float* parprior,float* xprior,curandState* s){
+    __device__ void prior(float* parprior,float* parmodel,curandState* s){
 
-    xprior[0] = gennormf(parprior[0],parprior[1],s);
-    xprior[1] = gennormf(parprior[2],parprior[3],s);
+    parmodel[0] = gennormf(parprior[0],parprior[1],s);
+    parmodel[1] = gennormf(parprior[2],parprior[3],s);
 
     return;
 

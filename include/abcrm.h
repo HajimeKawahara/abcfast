@@ -7,9 +7,9 @@ extern "C"{
     unsigned long seed;
     unsigned long id;
     curandState s;
-    int X;
+    int Ysim;
     int cnt = 0;
-    float p;
+    float parmodel;
 
     seed=10;
     id = blockIdx.x;
@@ -26,18 +26,17 @@ extern "C"{
     }
 
     /* sample p from the uniform distribution */
-    p = curand_uniform(&s);
+    parmodel = curand_uniform(&s);
 
     /* sampler */
-    X = binomialf(n,p,&s);
+    Ysim = binomialf(n,parmodel,&s);
 
-    if(rho(X,Yobs)<epsilon){
-    x[id] = p;
+    if(rho(Ysim,Yobs)<epsilon){
+    x[id] = parmodel;
     return;
     }
 
     }
-
 
     }
 

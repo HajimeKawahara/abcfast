@@ -32,9 +32,9 @@ if __name__ == "__main__":
     """
     /* the exponential distribution model generator */
 
-    __device__ float model(float* par, float* xmodel, curandState* s){
+    __device__ float model(float* parmodel, float* Ysim, curandState* s){
     
-    xmodel[0] = -log(curand_uniform(s))/par[0];
+    Ysim[0] = -log(curand_uniform(s))/parmodel[0];
 
     }
     """
@@ -42,9 +42,9 @@ if __name__ == "__main__":
     """
     #include "gengamma.h"
 
-    __device__ void prior(float* parprior,float* xprior,curandState* s){
+    __device__ void prior(float* parprior,float* parmodel,curandState* s){
 
-    xprior[0] = gammaf(parprior[0],parprior[1],s);
+    parmodel[0] = gammaf(parprior[0],parprior[1],s);
 
     return;
 

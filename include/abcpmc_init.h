@@ -14,8 +14,8 @@ extern "C"{
     int iblock = blockIdx.x;
     int ithread = threadIdx.x;
     unsigned long id = iblock*nthread + ithread;
-    float xprior[NMODEL];
-    float xmodel[NDATA];
+    float parmodel[NMODEL];
+    float Ysim[NDATA];
     
     curand_init(seed, id, 0, &s);
 
@@ -38,10 +38,10 @@ extern "C"{
       
       /* sampling a prior */
       if(ithread == 0){
-	prior(parprior, xprior, &s);
+	prior(parprior, parmodel, &s);
 	
 	for (int m=0; m<NMODEL; m++){
-	  cache[NSAMPLE+m] = xprior[m];
+	  cache[NSAMPLE+m] = parmodel[m];
 	}
 	
       }
@@ -53,13 +53,13 @@ extern "C"{
 	if (isample < NSAMPLE){
 	  
 	  for (int m=0; m<NMODEL; m++){
-	    xprior[m] = cache[NSAMPLE+m];
+	    parmodel[m] = cache[NSAMPLE+m];
 	  }
 	  
-	  model(xprior, xmodel, &s);
+	  model(parmodel, Ysim, &s);
 	  
 	  for (int m=0; m<NDATA; m++){
-	    cache[NDATA*isample+m] = xmodel[m];
+	    cache[NDATA*isample+m] = Ysim[m];
 	    
 	  }
 	}
@@ -109,7 +109,7 @@ extern "C"{
 	if(ithread==0){
 
 	  for (int m=0; m<NMODEL; m++){
-	    x[NMODEL*iblock + m] = xprior[m];
+	    x[NMODEL*iblock + m] = parmodel[m];
 	  }
 	  ntry[iblock]=cnt;
 	  dist[iblock]=rho;
