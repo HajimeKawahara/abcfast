@@ -40,8 +40,8 @@ if __name__ == "__main__":
 
     __device__ float model(float* parmodel, float* Ysim, curandState* s){
 
-    Ysim[0] = gennormf(parmodel[0],0.25,s);
-    Ysim[1] = gennormf(parmodel[1],0.25,s);
+    Ysim[0] = normf(parmodel[0],0.25,s);
+    Ysim[1] = normf(parmodel[1],0.25,s);
 
     }
     """
@@ -52,8 +52,8 @@ if __name__ == "__main__":
 
     __device__ void prior(float* parprior,float* parmodel,curandState* s){
 
-    parmodel[0] = gennormf(parprior[0],parprior[1],s);
-    parmodel[1] = gennormf(parprior[2],parprior[3],s);
+    parmodel[0] = normf(parprior[0],parprior[1],s);
+    parmodel[1] = normf(parprior[2],parprior[3],s);
 
     return;
 

@@ -12,17 +12,26 @@ if __name__ == "__main__":
     tstart=time.time()
     
     print("*******************************************")
-    print("GPU ABC PMC Method.")
-    print("This code demonstrates an exponential example in Section 5 in Turner and Van Zandt (2012) JMP 56, 69, with some modifications.")
+    print("GPU ABC PMC Method for Hierarchical Binomial Distribution.")
+    print("This code demonstrates an exponential example in Section 6 in Turner and Van Zandt (2012) JMP 56, 69, with some modifications.")
     print("*******************************************")
 
     #preparing data
-    nsample=500
-    lambda_true=0.1
-    Yobs=random.exponential(1.0/lambda_true,nsample)
 
+    nsub = 4 #number of subjects    
+    nres= 100 # number of observation per subject
+    nsample=nsub*nres
+
+    logitp = random.normal(loc=-1.0,scale=np.sqrt(0.5),size=nsub)
+    ptrue = np.exp(logitp)/(1 + np.exp(logitp))
+    Ysum_obs=np.array([])
+    subindex=np.array([],dtype=np.int32)
+    for j,p in enumerate(ptrue):
+        Ysum_obs=np.concatenate([Ysum_obs,[random.binomial(nres,p)]])
+        subindex=np.concatenate([subindex,np.ones(nres,dtype=np.int32)*j])
+    
     # start ABCpmc 
-    abc=ABCpmc()
+    abc=ABCpmc(hyper=True)
     abc.maxtryx=10000000#debug magic
     abc.npart=512#debug magic
 
@@ -34,28 +43,51 @@ if __name__ == "__main__":
 
     __device__ float model(float* parmodel, float* Ysim, curandState* s){
     
-    Ysim[0] = -log(curand_uniform(s))/parmodel[0];
+    if (curand_uniform(s) <= parmodel[0]){
+    Ysim[0] = 1.0;
+    }else{
+    Ysim[0] = 0.0;
+    }
 
     }
     """
     abc.prior=\
     """
-    #include "gengamma.h"
+    #include "gennorm.h"
 
     __device__ void prior(float* parprior,float* parmodel,curandState* s){
 
-    parmodel[0] = gammaf(parprior[0],parprior[1],s);
+    float logitp;
+
+    logitp = normf(parprior[0],parprior[1],s);
+    parmodel[0] = exp(logitp)/(1.0 + exp(logitp));
 
     return;
 
     }
     """
 
+    abc.parhyper=np.array([0.0,100.0,0.1,0.1]) #mu_mu, xi_mu, alpha_sigma, beta_sigma
+    abc.hyperprior=\
+    """
+    #include "gengamma.h"
+
+    __device__ void hyperprior(float* parhyper, float* parprior,curandState* s){
+
+    parprior[0] = normf(parhyper[0],parhyper[1],s);
+    parprior[1] = 1.0/gammaf(parhyper[2],parhyper[3],s);
+
+    return;
+
+    }
+    """
+    
+    
     # data and the summary statistics
-    abc.nsample = len(Yobs)
+    abc.subindex = subindex
     abc.ndata = 1
-    Ysum = np.sum(Yobs)
-    abc.Ysm = np.array([Ysum])
+    abc.nprior = 2 
+    abc.Ysm = Ysum_obs
     
     # prior functional form
     def fprior():
@@ -65,7 +97,6 @@ if __name__ == "__main__":
     abc.fprior = fprior()#
     
     #set prior parameters
-    abc.parprior=np.array([0.1,0.1]) #alpha, beta
     abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
 
     #initial run of abc pmc
@@ -73,6 +104,7 @@ if __name__ == "__main__":
     abc.run()
     abc.check()
     plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    sys.exit()
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
         abc.run()
@@ -83,7 +115,7 @@ if __name__ == "__main__":
     
     #plotting...
     plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    alpha=abc.parprior[0]+abc.nsample
+    alpha=abc.parprior[0]+abc.n
     beta=abc.parprior[1]+Ysum
     xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")

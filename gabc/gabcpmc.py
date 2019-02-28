@@ -5,7 +5,7 @@ from pycuda.compiler import SourceModule
 from gabc.utils.statutils import *
 import sys
 
-def gabcpmc_module (model,prior,nmodel,ndata,nsample,maxtryx=10000000):
+def gabcpmc_module (model,prior,nmodel,ndata,nsample,footer,nprior=None,nsubject=None,hyperprior=None,maxtryx=10000000):
     header=\
     "    #define NMODEL "+str(nmodel)+"\n"\
     +"    #define NDATA "+str(ndata)+"\n"\
@@ -19,17 +19,24 @@ def gabcpmc_module (model,prior,nmodel,ndata,nsample,maxtryx=10000000):
 
     extern __shared__ volatile float cache[]; 
 
-    """\
-    
-    footer=\
     """
-    #include "abcpmc_init.h"
-    #include "abcpmc.h"
-    #include "compute_weight.h"
 
-    """
-    print(header+model+prior+footer)
-    source_module = SourceModule(header+model+prior+footer,options=['-use_fast_math'],no_extern_c=True)
+    if nprior is not None:
+        header = \
+        "    #define NPRIOR "+str(nprior)+"\n"\
+        +header
+
+    if nsubject is not None:
+        header = \
+        "    #define NSUBJECT "+str(nsubject)+"\n"\
+        +header
+        
+    if hyperprior is not None:
+        print(header+model+prior+hyperprior+footer)            
+        source_module = SourceModule(header+model+prior+hyperprior+footer,options=['-use_fast_math'],no_extern_c=True)
+    else:
+        print(header+model+prior+footer)
+        source_module = SourceModule(header+model+prior+footer,options=['-use_fast_math'],no_extern_c=True)
 
     return source_module
 
@@ -43,13 +50,13 @@ def setmem_device(npart,dtype):
 
     
 class ABCpmc(object):
-    def __init__(self):
-
+    def __init__(self,hyper=False):
+            
         self.maxtryx = 10000000 #MAXTRYX reduce this value when you debug the code.
         self.nthread_max = 1024 #MAX NUMBER OF THREADS IN A BLOCK
 
         self._npart = 512  # number of the particles (default=512)
-        self._nmodel = None    # number of the model parameters 
+        self._nmodel = None    # dimension of parameters in the model
         self._nsample = None # number of the data vector
         self._ndata = None # dimension of the data vector
         self._Ysm = None # summary statistics vector        
@@ -90,6 +97,22 @@ class ABCpmc(object):
         self.seed = -1
         self.prepare = False
 
+        if hyper:
+            #use hyperprior (Hierarchical Bayes)
+            self.hyper = True
+            self.nsubject = None
+            self._subindex = None
+            self._nprior = None
+            self._hyperprior = None
+            self._parhyper = None
+            self._dev_parhyper = None
+            
+        else:
+            #use prior
+            self.hyper = False
+
+
+        
     @property
     def ndata(self):
         return self._ndata
@@ -148,7 +171,7 @@ class ABCpmc(object):
     def prior(self,prior):
         self._prior = prior
         self.update_kernel()
-
+        
     @property
     def parprior(self):
         return self._parprior
@@ -158,14 +181,72 @@ class ABCpmc(object):
         self._parprior = parprior.astype(np.float32)
         self.dev_parprior = cuda.mem_alloc(self._parprior.nbytes)
         cuda.memcpy_htod(self.dev_parprior,self._parprior)
+        self.update_kernel()
+
+    @property
+    def nprior(self):
+        return self._nprior
+
+    @nprior.setter
+    def nprior(self,nprior):
+        self._nprior = nprior
+        self.update_kernel()
+        
+    @property
+    def hyperprior(self):
+        return self._hyperprior
+    
+    @hyperprior.setter
+    def hyperprior(self,hyperprior):
+        self._hyperprior = hyperprior
+        self.update_kernel()
+
+    @property
+    def parhyper(self):
+        return self._parhyper
+
+    @parhyper.setter
+    def parhyper(self,parhyper):
+        self._parhyper = parhyper.astype(np.float32)
+        self.dev_parhyper = cuda.mem_alloc(self._parhyper.nbytes)
+        cuda.memcpy_htod(self.dev_parhyper,self._parhyper)
+        self.update_kernel()
+
+    @property
+    def subindex(self):
+        return self._subindex
+
+    @subindex.setter
+    def subindex(self,subindex):
+        self.nsample=len(subindex)
+        self.nsubject=len(np.unique(subindex))        
+        self._subindex = subindex.astype(np.int32)
+        self.dev_subindex = cuda.mem_alloc(self._subindex.nbytes)
+        cuda.memcpy_htod(self.dev_subindex,self._subindex)
+        self.update_kernel()
         
     def update_kernel(self):        
+        if self.hyper:            
+            self.update_hyper_kernel()
+        else:
+            self.update_normal_kernel()
+
+
+    def update_normal_kernel(self):
+        #Normal mode
         if self._model is not None \
            and self._prior is not None and self._npart is not None \
            and self._nmodel is not None and self._ndata is not None \
            and self._nsample is not None:
             
-            self.source_module=gabcpmc_module(self._model,self._prior,self._nmodel,self._ndata,self._nsample,maxtryx=self.maxtryx)
+            footer=\
+    """
+    #include "abcpmc_init.h"
+    #include "abcpmc.h"
+    #include "compute_weight.h"
+    """
+
+            self.source_module=gabcpmc_module(self._model,self._prior,self._nmodel,self._ndata,self._nsample,footer,maxtryx=self.maxtryx)
             self.pkernel_init=self.source_module.get_function("abcpmc_init")
             self.pkernel=self.source_module.get_function("abcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
@@ -178,6 +259,37 @@ class ABCpmc(object):
             self.Qmat,self.dev_Qmat=setmem_device(self._nmodel*self._nmodel,np.float32)
             self.nthread = min(self.nthread_max,self._nsample)
             self.prepare = True
+
+    def update_hyper_kernel(self):
+        #Hierarchical mode
+
+        if self._model is not None and self._prior is not None\
+           and self._hyperprior is not None and self._npart is not None \
+           and self._nmodel is not None and self._ndata is not None \
+           and self._nsample is not None and self._nprior is not None \
+           and self._subindex is not None and self._parhyper is not None:
+
+            footer=\
+"""
+    #include "habcpmc_init.h"
+    #include "abcpmc.h"
+    #include "compute_weight.h"
+"""            
+            self.source_module=gabcpmc_module(self._model,self._prior,self._nmodel,self._ndata,self._nsample,footer,\
+                                              nprior=self._nprior, nsubject=self.nsubject, hyperprior=self.hyperprior, maxtryx=self.maxtryx)
+            self.pkernel_init=self.source_module.get_function("habcpmc_init")
+            self.pkernel=self.source_module.get_function("abcpmc")
+            self.wkernel=self.source_module.get_function("compute_weight")
+            
+            self.x,self.dev_x=setmem_device(self._npart*self._nmodel,np.float32)
+            self.xx,self.dev_xx=setmem_device(self._npart*self._nmodel,np.float32)
+            self.ntry,self.dev_ntry=setmem_device(self._npart,np.int32)
+            self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
+            self.invcov,self.dev_invcov=setmem_device(self._nmodel*self._nmodel,np.float32)
+            self.Qmat,self.dev_Qmat=setmem_device(self._nmodel*self._nmodel,np.float32)
+            self.nthread = min(self.nthread_max,self._nsample)
+            self.prepare = True
+
             
     @property
     def Ysm(self):
@@ -191,37 +303,54 @@ class ABCpmc(object):
 #        self.nsm = len(self._Ysm)
         
     def run(self):
-        
-        if self.iteration == 0:
+        if self.hyper:
+            if self.iteration == 0:
 
-            self.epsilon=self.epsilon_list[self.iteration]
-            sharedsize=(self._nsample*self._ndata+self._nmodel)*4 #byte
-            self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_parprior,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
-
-            cuda.memcpy_dtoh(self.x, self.dev_x)
-            
-            #update covariance
-            self.update_invcov()
-            #update weight
-            self.init_weight()
-            self.iteration = 1
-            
+                self.epsilon=self.epsilon_list[self.iteration]
+                sharedsize=(self._nsample*self._ndata+self._nprior+self.nsubject*self._nmodel)*4 #byte
+                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_parhyper,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),self.dev_subindex,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                
+                cuda.memcpy_dtoh(self.x, self.dev_x)
+                
+                #update covariance
+#                self.update_invcov()
+                #update weight
+#                self.init_weight()
+#                self.iteration = 1
+            else:
+                print("NOT YET IMPLEMENTED")
+                
         else:
+            if self.iteration == 0:
 
-            self.epsilon=self.epsilon_list[self.iteration]
-            sharedsize=(self._nsample*self._ndata+self._nmodel)*4 #byte
-            self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
-
-            cuda.memcpy_dtoh(self.x, self.dev_xx)
-            
-            #update covariance
-            self.update_invcov()
-            #update weight
-            self.update_weight()
-            #swap
-            self.dev_x, self.dev_xx = self.dev_xx, self.dev_x
-            self.dev_w, self.dev_ww = self.dev_ww, self.dev_w
-            self.iteration = self.iteration + 1
+                self.epsilon=self.epsilon_list[self.iteration]
+                sharedsize=(self._nsample*self._ndata+self._nmodel)*4 #byte
+                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_parprior,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                
+                cuda.memcpy_dtoh(self.x, self.dev_x)
+                
+                #update covariance
+                self.update_invcov()
+                #update weight
+                self.init_weight()
+                self.iteration = 1
+                
+            else:
+                
+                self.epsilon=self.epsilon_list[self.iteration]
+                sharedsize=(self._nsample*self._ndata+self._nmodel)*4 #byte
+                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                
+                cuda.memcpy_dtoh(self.x, self.dev_xx)
+                
+                #update covariance
+                self.update_invcov()
+                #update weight
+                self.update_weight()
+                #swap
+                self.dev_x, self.dev_xx = self.dev_xx, self.dev_x
+                self.dev_w, self.dev_ww = self.dev_ww, self.dev_w
+                self.iteration = self.iteration + 1
             
     def check(self):
         cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
@@ -303,7 +432,18 @@ class ABCpmc(object):
             if self._ndata is None:
                 print("SET .ndata (# of the output parameters of the model)")
             if self._nsample is None:
-                print("SET .nsample (# of the samples)")            
+                print("SET .nsample (# of the samples)")
+
+            if self.hyper:
+                if self._hyperprior is None:
+                    print("SET .hyperprior")
+                if self._nprior is None:
+                    print("SET .nprior")
+                if self._parhyper is None:
+                    print("SET .parhyper (the control parameter of the hyperparameter)")
+                if self._subindex is None:
+                    print("SET .subindex")
+                
             sys.exit()
 
         if self._Ysm is None:
