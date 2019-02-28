@@ -43,14 +43,27 @@ Directory: random_gen
 You need to prepare
 
 ### model
-data sampler with given model parameters, **Ysim(NDATA) ~ model( param(NPARAM) )**,
+data sampler with given (model) parameters,
+
+**Ysim(NDATA) ~ model( param(NPARAM) )**,
+
 c based or prepared python function
 
 ### prior
-random number generator from a prior distribution, **param(NPARAM) ~ prior( hparam(NHPARAM) )**, 
+parameter sample from a prior distribution,
+
+**param(NPARAM) ~ prior()**, 
+
 c based or prepared python function  
 
 ### fprior
 a prior density distribution to compute weights, python function
 
+# Hierarchical ABC
+
+ in preparation
+
+# Current Status
+
 This code is in the beta stage (very unstable). Ask [Hajime Kawahara](http://secondearths.sakura.ne.jp/en/index.html) for more details.
+

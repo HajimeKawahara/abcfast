@@ -83,7 +83,7 @@ extern "C"{
       isample = p*nthread + ithread;
       if(isample < NSAMPLE){
 	
-	model(param, Ysim, &s);
+	model(Ysim, param, &s);
 	for (int m=0; m<NDATA; m++){
 	  cache[NDATA*isample+m] = Ysim[m];
 	}

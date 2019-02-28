@@ -41,7 +41,7 @@ if __name__ == "__main__":
     """
     /* the exponential distribution model generator */
 
-    __device__ float model(float* param, float* Ysim, curandState* s){
+    __device__ float model(float* Ysim, float* param, curandState* s){
     
     if (curand_uniform(s) <= param[0]){
     Ysim[0] = 1.0;
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     """
     #include "gennorm.h"
 
-    __device__ void prior(float* hparam,float* param,curandState* s){
+    __device__ void prior(float* param,float* hparam,curandState* s){
 
     float logitp;
 
@@ -67,15 +67,15 @@ if __name__ == "__main__":
     }
     """
 
-    abc.parhyper=np.array([0.0,100.0,0.1,0.1]) #mu_mu, xi_mu, alpha_sigma, beta_sigma
+    parhyper=np.array([0.0,100.0,0.1,0.1]) #mu_mu, xi_mu, alpha_sigma, beta_sigma
     abc.hyperprior=\
     """
     #include "gengamma.h"
 
-    __device__ void hyperprior(float* parhyper, float* hparam,curandState* s){
+    __device__ void hyperprior(float* hparam,curandState* s){
 
-    hparam[0] = normf(parhyper[0],parhyper[1],s);
-    hparam[1] = 1.0/gammaf(parhyper[2],parhyper[3],s);
+    hparam[0] = normf(0.0,100.0,s);
+    hparam[1] = 1.0/gammaf(0.1,0.1,s);
 
     return;
 
@@ -91,8 +91,8 @@ if __name__ == "__main__":
     
     # prior functional form
     def fprior():
-        def f(x,hparam):
-            return gammafunc.pdf(x, hparam[0],scale=1.0/hparam[1])
+        def f(x):
+            return gammafunc.pdf(x)
         return f
     abc.fprior = fprior()#
     

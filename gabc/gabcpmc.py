@@ -86,8 +86,8 @@ class ABCpmc(object):
         self.epsilon = None
         self._model = None
         self._prior = None
-        self._hparam = None
-        self._dev_hparam = None
+#        self._hparam = None
+#        self._dev_hparam = None
 
         self.dev_Ki = None
         self.dev_Li = None
@@ -104,8 +104,8 @@ class ABCpmc(object):
             self._subindex = None
             self._nhparam = None
             self._hyperprior = None
-            self._parhyper = None
-            self._dev_parhyper = None
+#            self._parhyper = None
+#            self._dev_parhyper = None
             
         else:
             #use prior
@@ -172,16 +172,16 @@ class ABCpmc(object):
         self._prior = prior
         self.update_kernel()
         
-    @property
-    def hparam(self):
-        return self._hparam
+#    @property
+#    def hparam(self):
+#        return self._hparam
 
-    @hparam.setter
-    def hparam(self,hparam):
-        self._hparam = hparam.astype(np.float32)
-        self.dev_hparam = cuda.mem_alloc(self._hparam.nbytes)
-        cuda.memcpy_htod(self.dev_hparam,self._hparam)
-        self.update_kernel()
+#    @hparam.setter
+#    def hparam(self,hparam):
+#        self._hparam = hparam.astype(np.float32)
+#        self.dev_hparam = cuda.mem_alloc(self._hparam.nbytes)
+#        cuda.memcpy_htod(self.dev_hparam,self._hparam)
+#        self.update_kernel()
 
     @property
     def nhparam(self):
@@ -201,16 +201,16 @@ class ABCpmc(object):
         self._hyperprior = hyperprior
         self.update_kernel()
 
-    @property
-    def parhyper(self):
-        return self._parhyper
+#    @property
+#    def parhyper(self):
+#        return self._parhyper
 
-    @parhyper.setter
-    def parhyper(self,parhyper):
-        self._parhyper = parhyper.astype(np.float32)
-        self.dev_parhyper = cuda.mem_alloc(self._parhyper.nbytes)
-        cuda.memcpy_htod(self.dev_parhyper,self._parhyper)
-        self.update_kernel()
+#    @parhyper.setter
+#    def parhyper(self,parhyper):
+#        self._parhyper = parhyper.astype(np.float32)
+#        self.dev_parhyper = cuda.mem_alloc(self._parhyper.nbytes)
+#        cuda.memcpy_htod(self.dev_parhyper,self._parhyper)
+#        self.update_kernel()
 
     @property
     def subindex(self):
@@ -267,7 +267,7 @@ class ABCpmc(object):
            and self._hyperprior is not None and self._npart is not None \
            and self._nparam is not None and self._ndata is not None \
            and self._nsample is not None and self._nhparam is not None \
-           and self._subindex is not None and self._parhyper is not None:
+           and self._subindex is not None:
 
             footer=\
 """
@@ -308,7 +308,7 @@ class ABCpmc(object):
 
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
-                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_parhyper,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),self.dev_subindex,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),self.dev_subindex,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
                 
@@ -325,7 +325,7 @@ class ABCpmc(object):
 
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nparam)*4 #byte
-                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_hparam,self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
                 
@@ -405,9 +405,9 @@ class ABCpmc(object):
         cuda.memcpy_dtoh(self.w, self.dev_ww)
 
         if self._nparam == 1:            
-            pri=self.fprior(self.x, self.hparam)
+            pri=self.fprior(self.x)
         else:
-            pri=self.fprior(self.xw, self.hparam)
+            pri=self.fprior(self.xw)
     
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
@@ -439,8 +439,6 @@ class ABCpmc(object):
                     print("SET .hyperprior")
                 if self._nhparam is None:
                     print("SET .nhparam")
-                if self._parhyper is None:
-                    print("SET .parhyper (the control parameter of the hyperparameter)")
                 if self._subindex is None:
                     print("SET .subindex")
                 
