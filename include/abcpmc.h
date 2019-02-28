@@ -1,19 +1,19 @@
 /* abcpmc */
 /* 
 In this model, parhyper is fixed.
-- the prior marameters (parprior) is fixed.
-- the model parameters (parmodel) is common in a grid.
+- the prior marameters (hparam) is fixed.
+- the model parameters (param) is common in a grid.
 
-parmodel(NMODEL) ~ prior( parprior(NPRIOR) )
-Ysim(NDATA) ~ model( parmodel(NMODEL) )
+param(NPARAM) ~ prior( hparam(NHPARAM) )
+Ysim(NDATA) ~ model( param(NPARAM) )
 
-NPRIOR: dimension of the prior parameters (parprior)
-NMODEL: dimension of the model parameters (parmodel)
+NHPARAM: dimension of the prior parameters (hparam)
+NPARAM: dimension of the model parameters (param)
 NDATA: number of the output parameters of a model
 NSAMPLE: number of the samples in a dataset
 
 - cache[k]
-k= +NDATA*NSAMPLE for sumulated data Ysim, +NMODEL for the model parameters
+k= +NDATA*NSAMPLE for sumulated data Ysim, +NPARAM for the model parameters
 
 */
 
@@ -35,9 +35,9 @@ extern "C"{
     float uni;
     int isel;
     int isample;
-    float parmodel[NMODEL];
+    float param[NPARAM];
     float Ysim[NDATA];
-    float rn[NMODEL];
+    float rn[NPARAM];
     
     curand_init(seed, id, 0, &s);
 
@@ -48,8 +48,8 @@ extern "C"{
     if(cnt > MAXTRYX){
       if(ithread==0){
 	printf("EXCEED MAXTRYX. iblock=%d \n",iblock);
-	for (int m=0; m<NMODEL; m++){
-	    x[NMODEL*iblock + m] = CUDART_NAN_F;
+	for (int m=0; m<NPARAM; m++){
+	    x[NPARAM*iblock + m] = CUDART_NAN_F;
 	}
 	ntry[iblock]=MAXTRYX;	  
       }
@@ -59,31 +59,31 @@ extern "C"{
     /* sampling a prior from the previous posterior*/
     if(ithread == 0){
       isel=aliasgen(Ki, Li, Ui, npart,&s);
-      for (int m=0; m<NMODEL; m++){
+      for (int m=0; m<NPARAM; m++){
 	rn[m] = curand_normal(&s);
       }
 
-      for (int m=0; m<NMODEL; m++){
-	parmodel[m]=xprev[NMODEL*isel+m];
+      for (int m=0; m<NPARAM; m++){
+	param[m]=xprev[NPARAM*isel+m];
 	
-	for (int k=0; k<NMODEL; k++){
-	  parmodel[m] += Qmat[m*NMODEL+k]*rn[k];
+	for (int k=0; k<NPARAM; k++){
+	  param[m] += Qmat[m*NPARAM+k]*rn[k];
 	}
 	
-	cache[NDATA*NSAMPLE+m] = parmodel[m];
+	cache[NDATA*NSAMPLE+m] = param[m];
       }
     }
     __syncthreads();
     /* ===================================================== */
-    for (int m=0; m<NMODEL; m++){
-      parmodel[m] = cache[NDATA*NSAMPLE+m];
+    for (int m=0; m<NPARAM; m++){
+      param[m] = cache[NDATA*NSAMPLE+m];
     }
 
     for (int p=0; p<int(float(NSAMPLE-1)/float(nthread))+1; p++){
       isample = p*nthread + ithread;
       if(isample < NSAMPLE){
 	
-	model(parmodel, Ysim, &s);
+	model(param, Ysim, &s);
 	for (int m=0; m<NDATA; m++){
 	  cache[NDATA*isample+m] = Ysim[m];
 	}
@@ -127,8 +127,8 @@ extern "C"{
     if(rho<epsilon){
       
       if(ithread==0){
-	for (int m=0; m<NMODEL; m++){
-	  x[NMODEL*iblock + m] = parmodel[m];
+	for (int m=0; m<NPARAM; m++){
+	  x[NPARAM*iblock + m] = param[m];
 	}
 	ntry[iblock]=cnt;
 	dist[iblock]=rho;

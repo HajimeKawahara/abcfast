@@ -27,14 +27,14 @@ if __name__ == "__main__":
     abc.npart=512#debug magic
 
     # input model/prior
-    abc.nmodel=1
+    abc.nparam=1
     abc.model=\
     """
     /* the exponential distribution model generator */
 
-    __device__ float model(float* parmodel, float* Ysim, curandState* s){
+    __device__ float model(float* param, float* Ysim, curandState* s){
     
-    Ysim[0] = -log(curand_uniform(s))/parmodel[0];
+    Ysim[0] = -log(curand_uniform(s))/param[0];
 
     }
     """
@@ -42,9 +42,9 @@ if __name__ == "__main__":
     """
     #include "gengamma.h"
 
-    __device__ void prior(float* parprior,float* parmodel,curandState* s){
+    __device__ void prior(float* hparam,float* param,curandState* s){
 
-    parmodel[0] = gammaf(parprior[0],parprior[1],s);
+    param[0] = gammaf(hparam[0],hparam[1],s);
 
     return;
 
@@ -59,13 +59,13 @@ if __name__ == "__main__":
     
     # prior functional form
     def fprior():
-        def f(x,parprior):
-            return gammafunc.pdf(x, parprior[0],scale=1.0/parprior[1])
+        def f(x,hparam):
+            return gammafunc.pdf(x, hparam[0],scale=1.0/hparam[1])
         return f
     abc.fprior = fprior()#
     
     #set prior parameters
-    abc.parprior=np.array([0.1,0.1]) #alpha, beta
+    abc.hparam=np.array([0.1,0.1]) #alpha, beta
     abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
 
     #initial run of abc pmc
@@ -83,8 +83,8 @@ if __name__ == "__main__":
     
     #plotting...
     plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    alpha=abc.parprior[0]+abc.nsample
-    beta=abc.parprior[1]+Ysum
+    alpha=abc.hparam[0]+abc.nsample
+    beta=abc.hparam[1]+Ysum
     xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")
     plt.xlabel("$\lambda$")

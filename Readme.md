@@ -43,11 +43,11 @@ Directory: random_gen
 You need to prepare
 
 ### model
-data sampler with given model parameters, **Ysim(NDATA) ~ model( parmodel(NMODEL) )**,
+data sampler with given model parameters, **Ysim(NDATA) ~ model( param(NPARAM) )**,
 c based or prepared python function
 
 ### prior
-random number generator from a prior distribution, **parmodel(NMODEL) ~ prior( parprior(NPRIOR) )**, 
+random number generator from a prior distribution, **param(NPARAM) ~ prior( hparam(NHPARAM) )**, 
 c based or prepared python function  
 
 ### fprior

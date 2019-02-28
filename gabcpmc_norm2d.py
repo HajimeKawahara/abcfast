@@ -31,17 +31,17 @@ if __name__ == "__main__":
     abc.npart=512#debug magic
     
     # input model/prior
-    abc.nmodel=2 #number of the model parameter = 2: (mean0, mean1)
+    abc.nparam=2 #number of the model parameter = 2: (mean0, mean1)
     abc.model=\
     """
     #include "gennorm.h"
 
     /* the exponential distribution model generator */
 
-    __device__ float model(float* parmodel, float* Ysim, curandState* s){
+    __device__ float model(float* param, float* Ysim, curandState* s){
 
-    Ysim[0] = normf(parmodel[0],0.25,s);
-    Ysim[1] = normf(parmodel[1],0.25,s);
+    Ysim[0] = normf(param[0],0.25,s);
+    Ysim[1] = normf(param[1],0.25,s);
 
     }
     """
@@ -50,10 +50,10 @@ if __name__ == "__main__":
     abc.prior=\
     """
 
-    __device__ void prior(float* parprior,float* parmodel,curandState* s){
+    __device__ void prior(float* hparam,float* param,curandState* s){
 
-    parmodel[0] = normf(parprior[0],parprior[1],s);
-    parmodel[1] = normf(parprior[2],parprior[3],s);
+    param[0] = normf(hparam[0],hparam[1],s);
+    param[1] = normf(hparam[2],hparam[3],s);
 
     return;
 
@@ -68,16 +68,16 @@ if __name__ == "__main__":
     
     # prior functional form
     def fprior():
-        def f(x,parprior):
-            means = [parprior[0], parprior[2]]
-            covs  = np.matrix([[parprior[1], 0.0], [0.0, parprior[3]]])
+        def f(x,hparam):
+            means = [hparam[0], hparam[2]]
+            covs  = np.matrix([[hparam[1], 0.0], [0.0, hparam[3]]])
             return mnormfunc.pdf(x, mean=means, cov=covs)
         return f
     abc.fprior = fprior()#
 
     
     #set prior parameters
-    abc.parprior=np.array([1.0,0.5,1.0,0.5]) #fixed parameters of a prior, mean0, sigma0, mean1, sigma1.
+    abc.hparam=np.array([1.0,0.5,1.0,0.5]) #fixed parameters of a prior, mean0, sigma0, mean1, sigma1.
     
     abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.05])
 

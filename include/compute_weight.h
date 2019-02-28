@@ -20,16 +20,16 @@ extern "C"{
       ipart = l*nthread+ithread;
       /* computing qf (Gaussian transition kernel) */
       qf=0.0;
-      for (int m=0; m<NMODEL; m++){
-	for (int k=0; k<NMODEL; k++){
-	  /* [NMODEL*ipart + m] - xnew[NMODEL*iblock + m] */
-	  /* xprev: ipart,imodel => NMODEL*ipart + imodel  */
-	  /* xnew: iblock,imodel => NMODEL*iblock + imodel  */
+      for (int m=0; m<NPARAM; m++){
+	for (int k=0; k<NPARAM; k++){
+	  /* [NPARAM*ipart + m] - xnew[NPARAM*iblock + m] */
+	  /* xprev: ipart,imodel => NPARAM*ipart + imodel  */
+	  /* xnew: iblock,imodel => NPARAM*iblock + imodel  */
 	  /* imodel = m,k  */
 	  /* here, computing an element of a quadratic form x_m x_k A_mk */
-	  /* A_mk := m*NMODEL + k = k*NMODEL + m because inverse covariance matrix is a symmetric matrix */
+	  /* A_mk := m*NPARAM + k = k*NPARAM + m because inverse covariance matrix is a symmetric matrix */
 
-	  qf += (xprev[NMODEL*ipart + m] - xnew[NMODEL*iblock + m])*(xprev[NMODEL*ipart + k] - xnew[NMODEL*iblock + k])/invcov[m*NMODEL + k];
+	  qf += (xprev[NPARAM*ipart + m] - xnew[NPARAM*iblock + m])*(xprev[NPARAM*ipart + k] - xnew[NPARAM*iblock + k])/invcov[m*NPARAM + k];
 	  
 	}
       }

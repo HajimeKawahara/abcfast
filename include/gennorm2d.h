@@ -1,13 +1,13 @@
 #include <curand_kernel.h>
 
-__device__ void gennorm2df(float* x,float* parprior, curandState* s){
+__device__ void gennorm2df(float* x,float* hparam, curandState* s){
   /* 2D gaussian with covariance matrix = [[a,c],[c,b]] */
   /* and mean = [mu0, mu1] */
-  float mu0 = parprior[0];
-  float mu1 = parprior[1];
-  float a = parprior[2];
-  float b = parprior[3];
-  float c = parprior[4];
+  float mu0 = hparam[0];
+  float mu1 = hparam[1];
+  float a = hparam[2];
+  float b = hparam[3];
+  float c = hparam[4];
 
   float norm;
   float e11;
