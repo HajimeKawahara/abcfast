@@ -1,6 +1,24 @@
 /* stucture of shared memory */
 /* abcpmc_init */
-/* k=0,...,(NSAMPLE-1)*NDATA, are X[i,j]=X[k], k=2*i + j, k=NSAMPLE*NDATA,...,NSAMPLE*nd+(NMODEL-1) is used for a block prior (xast) */
+
+/* 
+In this model, parhyper is fixed.
+- the prior marameters (parprior) is fixed.
+- the model parameters (parmodel) is common in a grid.
+
+parmodel(NMODEL) ~ prior( parprior(NPRIOR) )
+Ysim(NDATA) ~ model( parmodel(NMODEL) )
+
+NPRIOR: dimension of the prior parameters (parprior)
+NMODEL: dimension of the model parameters (parmodel)
+NDATA: number of the output parameters of a model
+NSAMPLE: number of the samples in a dataset
+
+- cache[k]
+k= +NDATA*NSAMPLE for sumulated data Ysim, +NMODEL for the model parameters
+
+*/
+
 
 extern "C"{
   __global__ void abcpmc_init(float* x, float* Ysm, float epsilon, int seed, float* parprior, float* dist, int* ntry, int ptwo){
@@ -41,27 +59,26 @@ extern "C"{
 	prior(parprior, parmodel, &s);
 	
 	for (int m=0; m<NMODEL; m++){
-	  cache[NSAMPLE+m] = parmodel[m];
+	  cache[NDATA*NSAMPLE+m] = parmodel[m];
 	}
 	
       }
       
       __syncthreads();
       /* ===================================================== */
+      for (int m=0; m<NMODEL; m++){
+	parmodel[m] = cache[NDATA*NSAMPLE+m];
+      }
+
       for (int p=0; p<int(float(NSAMPLE-1)/float(nthread))+1; p++){
 	isample = p*nthread + ithread;
-	if (isample < NSAMPLE){
-	  
-	  for (int m=0; m<NMODEL; m++){
-	    parmodel[m] = cache[NSAMPLE+m];
-	  }
-	  
-	  model(parmodel, Ysim, &s);
-	  
+	if (isample < NSAMPLE){	  	  
+
+	  model(parmodel, Ysim, &s);	  
 	  for (int m=0; m<NDATA; m++){
-	    cache[NDATA*isample+m] = Ysim[m];
-	    
+	    cache[NDATA*isample+m] = Ysim[m];	    
 	  }
+	  
 	}
       }
 

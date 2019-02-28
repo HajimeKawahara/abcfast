@@ -1,5 +1,22 @@
 /* abcpmc */
-/* i=0,...,n-1, are X[i], i=n,...,n+npart-1, are previous X[i] i=n+npart is used for a block prior (xast) */
+/* 
+In this model, parhyper is fixed.
+- the prior marameters (parprior) is fixed.
+- the model parameters (parmodel) is common in a grid.
+
+parmodel(NMODEL) ~ prior( parprior(NPRIOR) )
+Ysim(NDATA) ~ model( parmodel(NMODEL) )
+
+NPRIOR: dimension of the prior parameters (parprior)
+NMODEL: dimension of the model parameters (parmodel)
+NDATA: number of the output parameters of a model
+NSAMPLE: number of the samples in a dataset
+
+- cache[k]
+k= +NDATA*NSAMPLE for sumulated data Ysim, +NMODEL for the model parameters
+
+*/
+
 #include "genalias.h"
 
 extern "C"{
@@ -64,9 +81,13 @@ extern "C"{
 
     for (int p=0; p<int(float(NSAMPLE-1)/float(nthread))+1; p++){
       isample = p*nthread + ithread;
-      model(parmodel, Ysim, &s);
-      for (int m=0; m<NDATA; m++){
-	cache[NDATA*isample+m] = Ysim[m];
+      if(isample < NSAMPLE){
+	
+	model(parmodel, Ysim, &s);
+	for (int m=0; m<NDATA; m++){
+	  cache[NDATA*isample+m] = Ysim[m];
+	}
+	
       }
     }
 
