@@ -32,22 +32,26 @@ if __name__ == "__main__":
     
     # start ABCpmc 
     abc=ABCpmc(hyper=True)
-    abc.maxtryx=10000000#debug magic
-    abc.npart=512#debug magic
+    abc.maxtryx=10#debug magic
+    abc.npart=2#debug magic
 
     # input model/prior
     abc.nparam=1
+    abc.nsubject = nsub
+    abc.nsample = nsample
+
     abc.model=\
     """
     /* the exponential distribution model generator */
 
-    __device__ float model(float* Ysim, float* param, curandState* s){
+    __device__ void model(float* Ysim, float* param, curandState* s){
     
     if (curand_uniform(s) <= param[0]){
     Ysim[0] = 1.0;
     }else{
     Ysim[0] = 0.0;
     }
+    
 
     }
     """
@@ -58,9 +62,9 @@ if __name__ == "__main__":
     __device__ void prior(float* param,float* hparam,curandState* s){
 
     float logitp;
-
     logitp = normf(hparam[0],hparam[1],s);
     param[0] = exp(logitp)/(1.0 + exp(logitp));
+    /*    printf("logitp= %2.8f,p= %2.8f,h0=%2.8f, h1=%2.8f  \\n",logitp,param[0],hparam[0],hparam[1]);*/
 
     return;
 
@@ -93,10 +97,8 @@ if __name__ == "__main__":
 
     }
     """
-    
-    
+        
     # data and the summary statistics
-    abc.subindex = subindex
     abc.ndata = 1
     abc.nhparam = 2 
     abc.Ysm = Ysum_obs
@@ -108,6 +110,7 @@ if __name__ == "__main__":
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
+    print(abc.x)
     abc.check()
     plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
     sys.exit()

@@ -33,7 +33,7 @@ if __name__ == "__main__":
     """
     /* the exponential distribution model generator */
 
-    __device__ float model(float* Ysim, float* param, curandState* s){
+    __device__ void model(float* Ysim, float* param, curandState* s){
     
     Ysim[0] = -log(curand_uniform(s))/param[0];
 
