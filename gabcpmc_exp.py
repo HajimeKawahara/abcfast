@@ -6,6 +6,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from numpy import random
     from scipy.stats import gamma as gammafunc
+    from scipy.stats import norm as normfunc
     import time
     import sys
     
@@ -23,8 +24,8 @@ if __name__ == "__main__":
 
     # start ABCpmc 
     abc=ABCpmc()
-    abc.maxtryx=10000000#debug magic
-    abc.npart=512#debug magic
+    abc.maxtryx=10000000
+    abc.npart=512
 
     # input model/prior
     abc.nparam=1
@@ -62,6 +63,7 @@ if __name__ == "__main__":
     """
 
     # data and the summary statistics
+    abc.wide=5.0
     abc.nsample = len(Yobs)
     abc.ndata = 1
     Ysum = np.sum(Yobs)
@@ -69,30 +71,33 @@ if __name__ == "__main__":
     
     
     #set prior parameters
-    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
+    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2,1.e-3,1.e-4])
 
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
     abc.check()
-    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+#    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
         abc.run()
         abc.check()
 
     tend = time.time()
+
     print(tend-tstart,"sec")
     
     #plotting...
     plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.hist(abc.xres(),bins=20,label="resampled",density=True,alpha=0.5)
 
     alpha=alpha0+abc.nsample
     beta=beta0+Ysum
-    xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)
+    xl = np.linspace(gammafunc.ppf(0.0001, alpha,scale=1.0/beta),gammafunc.ppf(0.9999, alpha,scale=1.0/beta), 100)
     plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")
     plt.xlabel("$\lambda$")
     plt.ylabel("$\pi_\mathrm{ABC}$")
     plt.legend()
     plt.savefig("abcpmc.png")
     plt.show()
+

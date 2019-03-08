@@ -109,6 +109,7 @@ if __name__ == "__main__":
 
     ax2=fig.add_subplot(122)
 #    ax2.plot(xw0[:,0],xw0[:,1],".",alpha=0.3)
-    ax2.plot(abc.xw[:,0],abc.xw[:,1],".",alpha=0.7)
-    ax2.plot([means[0]],[means[1]],"o")
+    cl=ax2.scatter(abc.xw[:,0],abc.xw[:,1],c=abc.w,alpha=0.5)
+    plt.colorbar(cl)
+    ax2.plot([means[0]],[means[1]],"s",color="red")
     plt.show()

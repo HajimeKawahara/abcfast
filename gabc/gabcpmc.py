@@ -5,7 +5,7 @@ from pycuda.compiler import SourceModule
 from gabc.utils.statutils import *
 import sys
 
-def gabcpmc_module (model,prior,nparam,ndata,nsample,footer,nhparam=None,nsubject=None,hyperprior=None,maxtryx=10000000):
+def gabcpmc_module (model,prior,nparam,ndata,nsample,footer,nhparam=None,nsubject=None,nres=None,hyperprior=None,maxtryx=10000000):
     header=\
     "    #define NPARAM "+str(nparam)+"\n"\
     +"    #define NDATA "+str(ndata)+"\n"\
@@ -29,6 +29,11 @@ def gabcpmc_module (model,prior,nparam,ndata,nsample,footer,nhparam=None,nsubjec
     if nsubject is not None:
         header = \
         "    #define NSUBJECT "+str(nsubject)+"\n"\
+        +header
+
+    if nres is not None:
+        header = \
+        "    #define NRES "+str(nres)+"\n"\
         +header
         
     if hyperprior is not None:
@@ -64,7 +69,7 @@ class ABCpmc(object):
 
         #        self.nsm = None # dimension of the summary statistics vector
         
-        self.wide=8.0
+        self.wide=2.0
         self.epsilon_list = False
         self.nthread_use_max=512 # maximun number of the threads in a block for use
 
@@ -100,8 +105,9 @@ class ABCpmc(object):
         if hyper:
             #use hyperprior (Hierarchical Bayes)
             self.hyper = True
-            self.nsubject = None
-            self._subindex = None
+            self._nsubject = None
+            self.nres = None # number of observation per subject
+
             self._nhparam = None
             self._hyperprior = None
 #            self._parhyper = None
@@ -112,7 +118,11 @@ class ABCpmc(object):
             self.hyper = False
 
 
-        
+    #resampling
+    def xres(self):        
+        return np.random.choice(self.x,self._npart,p=self.w)
+
+            
     @property
     def ndata(self):
         return self._ndata
@@ -183,6 +193,7 @@ class ABCpmc(object):
 #        cuda.memcpy_htod(self.dev_hparam,self._hparam)
 #        self.update_kernel()
 
+
     @property
     def nhparam(self):
         return self._nhparam
@@ -201,28 +212,20 @@ class ABCpmc(object):
         self._hyperprior = hyperprior
         self.update_kernel()
 
-#    @property
-#    def parhyper(self):
-#        return self._parhyper
-
-#    @parhyper.setter
-#    def parhyper(self,parhyper):
-#        self._parhyper = parhyper.astype(np.float32)
-#        self.dev_parhyper = cuda.mem_alloc(self._parhyper.nbytes)
-#        cuda.memcpy_htod(self.dev_parhyper,self._parhyper)
-#        self.update_kernel()
-
     @property
-    def subindex(self):
-        return self._subindex
+    def nsubject(self):
+        return self._nsubject
 
-    @subindex.setter
-    def subindex(self,subindex):
-        self.nsample=len(subindex)
-        self.nsubject=len(np.unique(subindex))        
-        self._subindex = subindex.astype(np.int32)
-        self.dev_subindex = cuda.mem_alloc(self._subindex.nbytes)
-        cuda.memcpy_htod(self.dev_subindex,self._subindex)
+    @nsubject.setter
+    def nsubject(self,nsubject):
+        nres=int(self.nsample/nsubject)
+        if(self.nsample/nsubject - nres > 0.0):
+            print("nsubject=",nsubject)
+            print("nsample=",self.nsample)
+            sys.exit("Error: Invalid nsubject, nsample pair. nsample/nsubject must be integer (> 0).")
+                    
+        self.nres = nres
+        self._nsubject = nsubject
         self.update_kernel()
         
     def update_kernel(self):        
@@ -267,7 +270,7 @@ class ABCpmc(object):
            and self._hyperprior is not None and self._npart is not None \
            and self._nparam is not None and self._ndata is not None \
            and self._nsample is not None and self._nhparam is not None \
-           and self._subindex is not None:
+           and self._subindex is not None and self._nsubject is not None:
 
             footer=\
 """
@@ -276,7 +279,7 @@ class ABCpmc(object):
     #include "compute_weight.h"
 """            
             self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,footer,\
-                                              nhparam=self._nhparam, nsubject=self.nsubject, hyperprior=self.hyperprior, maxtryx=self.maxtryx)
+                                              nhparam=self._nhparam, nsubject=self._nsubject, nres=self.nres, hyperprior=self.hyperprior, maxtryx=self.maxtryx)
             self.pkernel_init=self.source_module.get_function("habcpmc_init")
             self.pkernel=self.source_module.get_function("abcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
@@ -308,7 +311,7 @@ class ABCpmc(object):
 
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
-                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),self.dev_subindex,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
                 
@@ -404,10 +407,16 @@ class ABCpmc(object):
 
         cuda.memcpy_dtoh(self.w, self.dev_ww)
 
-        if self._nparam == 1:            
-            pri=self.fprior(self.x)
+        if self.hyper:
+            if self._nhparam == 1:
+                pri=self.fhprior(self.x)
+            else:
+                pri=self.fhprior(self.xw)
         else:
-            pri=self.fprior(self.xw)
+            if self._nparam == 1:
+                pri=self.fprior(self.x)
+            else:
+                pri=self.fprior(self.xw)
     
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)

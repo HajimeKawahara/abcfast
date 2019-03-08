@@ -6,6 +6,8 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from numpy import random
     from scipy.stats import gamma as gammafunc
+    from scipy.stats import norm as normfunc
+
     import time
     import sys
     
@@ -25,10 +27,8 @@ if __name__ == "__main__":
     logitp = random.normal(loc=-1.0,scale=np.sqrt(0.5),size=nsub)
     ptrue = np.exp(logitp)/(1 + np.exp(logitp))
     Ysum_obs=np.array([])
-    subindex=np.array([],dtype=np.int32)
     for j,p in enumerate(ptrue):
         Ysum_obs=np.concatenate([Ysum_obs,[random.binomial(nres,p)]])
-        subindex=np.concatenate([subindex,np.ones(nres,dtype=np.int32)*j])
     
     # start ABCpmc 
     abc=ABCpmc(hyper=True)
@@ -67,7 +67,19 @@ if __name__ == "__main__":
     }
     """
 
-    parhyper=np.array([0.0,100.0,0.1,0.1]) #mu_mu, xi_mu, alpha_sigma, beta_sigma
+    mumu=0.0
+    ximu=10000.0
+    alphas=0.1
+    betas=0.1
+    # prior functional form
+    def fhprior():
+        def f(x):
+            h0=normfunc.pdf(x,loc=mumu,scale=np.sqrt(ximu) )
+            h1=1.0/gammafunc.pdf(x, alphas,scale=1.0/betas)
+            return np.array([h0,h1])
+        return f
+    abc.fhprior = fhprior()#
+
     abc.hyperprior=\
     """
     #include "gengamma.h"
@@ -89,12 +101,6 @@ if __name__ == "__main__":
     abc.nhparam = 2 
     abc.Ysm = Ysum_obs
     
-    # prior functional form
-    def fprior():
-        def f(x):
-            return gammafunc.pdf(x)
-        return f
-    abc.fprior = fprior()#
     
     #set prior parameters
     abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
