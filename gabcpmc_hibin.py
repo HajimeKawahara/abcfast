@@ -117,15 +117,16 @@ if __name__ == "__main__":
 
     #plot 0
     xw0=np.copy(abc.xw)
+
     fig=plt.figure()
     ax=fig.add_subplot(121)
     ax.hist(xw0[:,0][xw0[:,0]<1000],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.ylabel("mu")
+    plt.xlabel("mu")
 
     ax2=fig.add_subplot(122)
     ax2.hist(xw0[:,1],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
     plt.xlabel("log sigma")
-    plt.show()
+
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
         abc.run()
@@ -133,6 +134,11 @@ if __name__ == "__main__":
 
     tend = time.time()
     print(tend-tstart,"sec")
+
+    xw0=np.copy(abc.xw)
+    ax.hist(xw0[:,0][xw0[:,0]<1000],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    ax2=fig.add_subplot(122)
+    ax2.hist(xw0[:,1],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
 
     #plot Np-1
     plt.show()

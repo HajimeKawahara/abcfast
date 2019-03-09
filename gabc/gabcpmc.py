@@ -338,17 +338,15 @@ class ABCpmc(object):
                 self.init_weight()
                 self.iteration = 1
             else:
-                print("w=",self.w)
-                print("hyperparm=",self.xw)
-                print("cov=",self.invcov)
-                print("Q=",self.Qmat)
+                #print("w=",self.w)
+                #print("hyperparm=",self.xw)
+                #print("cov=",self.invcov)
+                #print("Q=",self.Qmat)
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
                 self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
-                print(self.x)
-                sys.exit()
                 #update covariance
                 self.update_invcov()
                 #update weight
@@ -441,16 +439,17 @@ class ABCpmc(object):
         #update weight
         sharedsize=int(self._npart*4) #byte
         nthread=min(self._npart,self.nthread_use_max)
+        print("=>",self.xw)
         
         self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, self.dev_invcov, block=(int(nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
         cuda.memcpy_dtoh(self.w, self.dev_ww)
-
+        print("=>",self.w)
+        
         if self.hyper:
             if self._nhparam == 1:
                 pri=self.fhprior(self.x)
             else:
-                sys.exit()
                 pri=self.fhprior(self.xw)
         else:
             if self._nparam == 1:
@@ -460,6 +459,11 @@ class ABCpmc(object):
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
         self.w=self.w.astype(np.float32)
+
+        print(pri)
+
+        print(self.w)
+        sys.exit()
         Ki,Li,Ui=genalias_init(self.w)
         cuda.memcpy_htod(self.dev_Ki,Ki)
         cuda.memcpy_htod(self.dev_Li,Li)
