@@ -5,6 +5,11 @@ from pycuda.compiler import SourceModule
 from gabc.utils.statutils import *
 import sys
 
+#Note:
+#self.x, self.xx : sampled parameters for the normal mode
+#self.x, self.xx : sampled hyperparameters for the hierarchical mode
+#
+
 def gabcpmc_module (model,prior,nparam,ndata,nsample,footer,nhparam=None,nsubject=None,nss=None,hyperprior=None,maxtryx=10000000):
     header=\
     "    #define NPARAM "+str(nparam)+"\n"\
@@ -100,6 +105,7 @@ class ABCpmc(object):
         self.dev_Ysm = None
 
         self.seed = -1
+        self.onedim=False #when nparam or hnparam(when hyper) is 1, be True by update_kernel
         self.prepare = False
 
         if hyper:
@@ -256,6 +262,9 @@ class ABCpmc(object):
             self.prepare = True
             self.ptwo = getptwo(self._nsample)
 
+            if self._nparam == 1:
+                self.onedim=True
+            
     def update_hyper_kernel(self):
         #Hierarchical mode
 
@@ -286,15 +295,17 @@ class ABCpmc(object):
             self.pkernel=self.source_module.get_function("abcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
             
-            self.x,self.dev_x=setmem_device(self._npart*self._nparam,np.float32)
-            self.xx,self.dev_xx=setmem_device(self._npart*self._nparam,np.float32)
+            self.x,self.dev_x=setmem_device(self._npart*self._nhparam,np.float32)
+            self.xx,self.dev_xx=setmem_device(self._npart*self._nhparam,np.float32)
             self.ntry,self.dev_ntry=setmem_device(self._npart,np.int32)
             self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
-            self.invcov,self.dev_invcov=setmem_device(self._nparam*self._nparam,np.float32)
-            self.Qmat,self.dev_Qmat=setmem_device(self._nparam*self._nparam,np.float32)
+            self.invcov,self.dev_invcov=setmem_device(self._nhparam*self._nhparam,np.float32)
+            self.Qmat,self.dev_Qmat=setmem_device(self._nhparam*self._nhparam,np.float32)
             self.nthread = min(self.nthread_max,self._nsample)
             self.prepare = True
 
+            if self._nhparam == 1:
+                self.onedim=True
             
     @property
     def Ysm(self):
@@ -317,9 +328,9 @@ class ABCpmc(object):
                 self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
-#                
+                
                 #update covariance
-#                self.update_invcov()
+                self.update_invcov()
                 #update weight
 #                self.init_weight()
 #                self.iteration = 1
@@ -381,14 +392,17 @@ class ABCpmc(object):
         cuda.memcpy_htod(self.dev_Ui,Ui)
 
     def update_invcov(self):
-        
+                
         #inverse covariance matrix
-        if self._nparam == 1:
+        if self.onedim:
             cov = self.wide*np.var(self.x)
             self.invcov = np.array(1.0/cov).astype(np.float32)
             self.Qmat = np.array([np.sqrt(cov)]).astype(np.float32)
         else:
-            self.xw=np.copy(self.x).reshape(self._npart,self._nparam)
+            if self.hyper:
+                self.xw=np.copy(self.x).reshape(self._npart,self._nhparam)
+            else:
+                self.xw=np.copy(self.x).reshape(self._npart,self._nparam)
             cov = self.wide*np.cov(self.xw.transpose(),bias=True)
             self.invcov = (np.linalg.inv(cov).flatten()).astype(np.float32)
             # Q matrix for multivariate Gaussian prior sampler

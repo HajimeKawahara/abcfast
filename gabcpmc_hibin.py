@@ -29,11 +29,11 @@ if __name__ == "__main__":
     Ysum_obs=np.array([])
     for j,p in enumerate(ptrue):
         Ysum_obs=np.concatenate([Ysum_obs,[random.binomial(nres,p)]])
-    
+    print("data:",Ysum_obs)
     # start ABCpmc 
     abc=ABCpmc(hyper=True)
-    abc.maxtryx=10#debug magic
-    abc.npart=2#debug magic
+    abc.maxtryx=100#debug magic
+    abc.npart=512#debug magic
 
     # input model/prior
     abc.nparam=1
@@ -62,10 +62,13 @@ if __name__ == "__main__":
     __device__ void prior(float* param,float* hparam,curandState* s){
 
     float logitp;
+    float el;
     logitp = normf(hparam[0],hparam[1],s);
-    param[0] = exp(logitp)/(1.0 + exp(logitp));
-    /*    printf("logitp= %2.8f,p= %2.8f,h0=%2.8f, h1=%2.8f  \\n",logitp,param[0],hparam[0],hparam[1]);*/
-
+    /* exp(18)(1+exp(18)) = 1.00000 effectively */
+    el = min(18.0,logitp);
+    el = exp(el);
+    param[0] = el/(1.0 + el);
+    
     return;
 
     }
@@ -90,7 +93,7 @@ if __name__ == "__main__":
 
     __device__ void hyperprior(float* hparam,curandState* s){
 
-    hparam[0] = normf(0.0,100.0,s);
+    hparam[0] = normf(0.0,10.0,s);
     hparam[1] = 1.0/gammaf(0.1,0.1,s);
 
     return;
@@ -110,9 +113,15 @@ if __name__ == "__main__":
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
-    print(abc.x)
     abc.check()
-    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    xw0=np.copy(abc.xw)
+    print(np.shape(xw0))
+    fig=plt.figure()
+    ax=fig.add_subplot(121)
+    ax.hist(xw0[:,0],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    ax=fig.add_subplot(122)
+    ax.hist(np.log(xw0[:,1]),bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.show()
     sys.exit()
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
