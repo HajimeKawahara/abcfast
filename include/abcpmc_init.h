@@ -21,7 +21,7 @@ k= +NDATA*NSAMPLE for sumulated data Ysim, +NPARAM for the model parameters
 
 
 extern "C"{
-  __global__ void abcpmc_init(float* x, float* Ysm, float epsilon, int seed, float* dist, int* ntry, int ptwo){
+  __global__ void abcpmc_init(float* x, float* Ysm, float epsilon, int seed, float* dist, int* ntry){
 
     curandState s;
     int cnt = 0;
@@ -90,10 +90,10 @@ extern "C"{
       /* sum of |X - Y|/ns */
       /* thread cooperating computation of rho */
 
-      int i = ptwo;
+      int i = PNSAMPLE;
       while(i !=0) {
 	
-	for (int p=0; p<int(float(NSAMPLE-1)/float(nthread))+1; p++){
+	for (int p=0; p<int(float(PNSAMPLE-1)/float(nthread))+1; p++){
 	  isample = p*nthread + ithread;
 	  if (isample + i < NSAMPLE && isample < i){
 	    

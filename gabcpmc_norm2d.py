@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     /* the exponential distribution model generator */
 
-    __device__ float model(float* Ysim,float* param,  curandState* s){
+    __device__ void model(float* Ysim,float* param,  curandState* s){
 
     Ysim[0] = normf(param[0],0.25,s);
     Ysim[1] = normf(param[1],0.25,s);
@@ -76,10 +76,7 @@ if __name__ == "__main__":
     abc.ndata = 2 #data dimension
     Ysum = np.sum(Yobs,axis=0)
     abc.Ysm = Ysum
-    
 
-    
-    
     abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.05])
 
     #initial run of abc pmc

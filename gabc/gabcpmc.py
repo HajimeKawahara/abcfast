@@ -15,6 +15,7 @@ def gabcpmc_module (model,prior,nparam,ndata,nsample,footer,nhparam=None,nsubjec
     "    #define NPARAM "+str(nparam)+"\n"\
     +"    #define NDATA "+str(ndata)+"\n"\
     +"    #define NSAMPLE "+str(nsample)+"\n"\
+    +"    #define PNSAMPLE "+str(getptwo(nsample))+"\n"\
     +"    #define MAXTRYX "+str(maxtryx)+"\n"\
     +"""
     #define CUDART_NAN_F __int_as_float(0x7fffffff)
@@ -26,6 +27,7 @@ def gabcpmc_module (model,prior,nparam,ndata,nsample,footer,nhparam=None,nsubjec
 
     """
 
+
     if nhparam is not None:
         header = \
         "    #define NHPARAM "+str(nhparam)+"\n"\
@@ -34,8 +36,11 @@ def gabcpmc_module (model,prior,nparam,ndata,nsample,footer,nhparam=None,nsubjec
     if nsubject is not None:
         header = \
         "    #define NSUBJECT "+str(nsubject)+"\n"\
+        +"    #define NSUBDAT "+str(nsubject*ndata)+"\n"\
+        +"    #define PNSUBDAT "+str(getptwo(nsubject*ndata))+"\n"\
+        +"    #define PNSS "+str(getptwo(nss))+"\n"\
         +header
-
+        
     if nss is not None:
         header = \
         "    #define NSS "+str(nss)+"\n"\
@@ -246,8 +251,8 @@ class ABCpmc(object):
     #include "abcpmc.h"
     #include "compute_weight.h"
     """
-
             self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,footer,maxtryx=self.maxtryx)
+            
             self.pkernel_init=self.source_module.get_function("abcpmc_init")
             self.pkernel=self.source_module.get_function("abcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
@@ -260,7 +265,6 @@ class ABCpmc(object):
             self.Qmat,self.dev_Qmat=setmem_device(self._nparam*self._nparam,np.float32)
             self.nthread = min(self.nthread_max,self._nsample)
             self.prepare = True
-            self.ptwo = getptwo(self._nsample)
 
             if self._nparam == 1:
                 self.onedim=True
@@ -286,8 +290,6 @@ class ABCpmc(object):
                 print("nsubject=",self._nsubject,"nsample=",self._nsample)
                 sys.exit("Error: Invalid nsubject, nsample pair. nsample/nsubject must be integer (> 0).")                    
             self.nss = nss
-            self.ptwo = getptwo(self.nss)*self._nsubject #used for computing summary statistics
-
             self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,footer,\
                                               nhparam=self._nhparam, nsubject=self._nsubject, nss=self.nss,\
                                               hyperprior=self.hyperprior, maxtryx=self.maxtryx)
@@ -325,25 +327,24 @@ class ABCpmc(object):
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
                 
-                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
-                
+
                 #update covariance
                 self.update_invcov()
+
                 #update weight
                 self.init_weight()
                 self.iteration = 1
             else:
-                print(self.w)
-                print(self.x)
+                print("w=",self.w)
+                print("hyperparm=",self.xw)
                 print("cov=",self.invcov)
-
                 print("Q=",self.Qmat)
-                
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
-                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
                 print(self.x)
@@ -362,7 +363,7 @@ class ABCpmc(object):
 
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nparam)*4 #byte
-                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
                 
@@ -376,7 +377,7 @@ class ABCpmc(object):
                 
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nparam)*4 #byte
-                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
                 

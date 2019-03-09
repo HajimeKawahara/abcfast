@@ -32,8 +32,8 @@ if __name__ == "__main__":
     print("data:",Ysum_obs)
     # start ABCpmc 
     abc=ABCpmc(hyper=True)
-    abc.maxtryx=1000#debug magic
-    abc.npart=16#debug magic
+    abc.maxtryx=100#debug magic
+    abc.npart=64#debug magic
 
     # input model/prior
     abc.nparam=1
