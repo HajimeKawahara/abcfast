@@ -120,11 +120,11 @@ extern "C"{
       
       if(rho<epsilon){
 	
+	if(ithread<NPARAM){
+	    x[NPARAM*iblock + ithread] = param[ithread];
+	}
+	
 	if(ithread==0){
-
-	  for (int m=0; m<NPARAM; m++){
-	    x[NPARAM*iblock + m] = param[m];
-	  }
 	  ntry[iblock]=cnt;
 	  dist[iblock]=rho;
 	}

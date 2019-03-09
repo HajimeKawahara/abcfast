@@ -277,7 +277,7 @@ class ABCpmc(object):
             footer=\
 """
     #include "habcpmc_init.h"
-    #include "abcpmc.h"
+    #include "habcpmc.h"
     #include "compute_weight.h"
 """            
 
@@ -292,7 +292,7 @@ class ABCpmc(object):
                                               nhparam=self._nhparam, nsubject=self._nsubject, nss=self.nss,\
                                               hyperprior=self.hyperprior, maxtryx=self.maxtryx)
             self.pkernel_init=self.source_module.get_function("habcpmc_init")
-            self.pkernel=self.source_module.get_function("abcpmc")
+            self.pkernel=self.source_module.get_function("habcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
             
             self.x,self.dev_x=setmem_device(self._npart*self._nhparam,np.float32)
@@ -332,10 +332,30 @@ class ABCpmc(object):
                 #update covariance
                 self.update_invcov()
                 #update weight
-#                self.init_weight()
-#                self.iteration = 1
+                self.init_weight()
+                self.iteration = 1
             else:
-                print("NOT YET IMPLEMENTED")
+                print(self.w)
+                print(self.x)
+                print("cov=",self.invcov)
+
+                print("Q=",self.Qmat)
+                
+                self.epsilon=self.epsilon_list[self.iteration]
+                sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
+                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,np.int32(self.ptwo),block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                
+                cuda.memcpy_dtoh(self.x, self.dev_xx)
+                print(self.x)
+                sys.exit()
+                #update covariance
+                self.update_invcov()
+                #update weight
+                self.update_weight()
+                #swap
+                self.dev_x, self.dev_xx = self.dev_xx, self.dev_x
+                self.dev_w, self.dev_ww = self.dev_ww, self.dev_w
+                self.iteration = self.iteration + 1
                 
         else:
             if self.iteration == 0:
@@ -401,9 +421,10 @@ class ABCpmc(object):
         else:
             if self.hyper:
                 self.xw=np.copy(self.x).reshape(self._npart,self._nhparam)
+                cov = self.wide*np.cov(self.xw.transpose(),bias=True)
             else:
                 self.xw=np.copy(self.x).reshape(self._npart,self._nparam)
-            cov = self.wide*np.cov(self.xw.transpose(),bias=True)
+                cov = self.wide*np.cov(self.xw.transpose(),bias=True)
             self.invcov = (np.linalg.inv(cov).flatten()).astype(np.float32)
             # Q matrix for multivariate Gaussian prior sampler
             [eigenvalues, eigenvectors] = np.linalg.eig(cov)
@@ -428,13 +449,13 @@ class ABCpmc(object):
             if self._nhparam == 1:
                 pri=self.fhprior(self.x)
             else:
+                sys.exit()
                 pri=self.fhprior(self.xw)
         else:
             if self._nparam == 1:
                 pri=self.fprior(self.x)
             else:
                 pri=self.fprior(self.xw)
-    
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
         self.w=self.w.astype(np.float32)

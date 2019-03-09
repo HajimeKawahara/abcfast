@@ -32,8 +32,8 @@ if __name__ == "__main__":
     print("data:",Ysum_obs)
     # start ABCpmc 
     abc=ABCpmc(hyper=True)
-    abc.maxtryx=100#debug magic
-    abc.npart=512#debug magic
+    abc.maxtryx=1000#debug magic
+    abc.npart=16#debug magic
 
     # input model/prior
     abc.nparam=1
@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     float logitp;
     float el;
-    logitp = normf(hparam[0],hparam[1],s);
+    logitp = normf(hparam[0],exp(hparam[1]),s);
     /* exp(18)(1+exp(18)) = 1.00000 effectively */
     el = min(18.0,logitp);
     el = exp(el);
@@ -75,14 +75,14 @@ if __name__ == "__main__":
     """
 
     mumu=0.0
-    ximu=10000.0
+    ximu=100.0
     alphas=0.1
     betas=0.1
-    # prior functional form
+    # hyperprior functional form hyperparameter = (mu,log(sigma))
     def fhprior():
         def f(x):
-            h0=normfunc.pdf(x,loc=mumu,scale=np.sqrt(ximu) )
-            h1=1.0/gammafunc.pdf(x, alphas,scale=1.0/betas)
+            h0=normfunc.pdf(x[:,0],loc=mumu,scale=np.sqrt(ximu) )
+            h1=np.log10(1.0/gammafunc.pdf(x[:,1], alphas,scale=1.0/betas))
             return np.array([h0,h1])
         return f
     abc.fhprior = fhprior()#
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     __device__ void hyperprior(float* hparam,curandState* s){
 
     hparam[0] = normf(0.0,10.0,s);
-    hparam[1] = 1.0/gammaf(0.1,0.1,s);
+    hparam[1] = log(1.0/gammaf(0.1,0.1,s));
 
     return;
 
@@ -114,15 +114,18 @@ if __name__ == "__main__":
     abc.check_preparation()
     abc.run()
     abc.check()
+
+    #plot 0
     xw0=np.copy(abc.xw)
-    print(np.shape(xw0))
     fig=plt.figure()
     ax=fig.add_subplot(121)
-    ax.hist(xw0[:,0],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    ax=fig.add_subplot(122)
-    ax.hist(np.log(xw0[:,1]),bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    ax.hist(xw0[:,0][xw0[:,0]<1000],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.ylabel("mu")
+
+    ax2=fig.add_subplot(122)
+    ax2.hist(xw0[:,1],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.xlabel("log sigma")
     plt.show()
-    sys.exit()
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
         abc.run()
@@ -130,15 +133,7 @@ if __name__ == "__main__":
 
     tend = time.time()
     print(tend-tstart,"sec")
-    
-    #plotting...
-    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    alpha=abc.hparam[0]+abc.n
-    beta=abc.hparam[1]+Ysum
-    xl = np.linspace(gammafunc.ppf(0.001, alpha,scale=1.0/beta),gammafunc.ppf(0.999, alpha,scale=1.0/beta), 100)
-    plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")
-    plt.xlabel("$\lambda$")
-    plt.ylabel("$\pi_\mathrm{ABC}$")
-    plt.legend()
-    plt.savefig("abcpmc.png")
+
+    #plot Np-1
     plt.show()
+
