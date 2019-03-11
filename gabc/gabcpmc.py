@@ -79,7 +79,8 @@ class ABCpmc(object):
         self.nthread = None #number of threads    
         self.nwparam = None #dimension for weight computing (=nparam for normal, nhparam for hyper)
         
-        #        self.nsm = None # dimension of the summary statistics vector
+        self.ess = None # Effective Sample Size
+        self.Ecrit = 0.8 # critical ESS/npart for Resampling
         
         self.wide=2.0
         self.epsilon_list = False
@@ -432,17 +433,6 @@ class ABCpmc(object):
             l = np.matrix(np.diag(np.sqrt(np.abs(eigenvalues))))
             Q = np.matrix(eigenvectors) * l
             self.Qmat=(Q.flatten()).astype(np.float32)
-#                print("cov=",cov)
-#                print("eigen=",eigenvalues)
-#                print("l=",l)
-#                print("Qmat(py)",Q)
-#            except:
-#                plt.legend()
-#                plt.show()
-#                print(self.x)
-#                print(cov)
-
-
                 
         cuda.memcpy_htod(self.dev_invcov,self.invcov)
         cuda.memcpy_htod(self.dev_Qmat,self.Qmat)
@@ -467,8 +457,17 @@ class ABCpmc(object):
 
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
+        self.ess=1.0/(np.linalg.norm(self.w)**2)
+        print("ESS=",self.ess,"Npart=",self._npart)
+        if self.ess < self.Ecrit*self._npart:
+            print("Resampling.")
+            self.x=np.random.choice(self.x,self._npart,p=self.w)
+            self.w=np.ones(self._npart)
+            self.w=self.w/np.sum(self.w)
+            
         self.w=self.w.astype(np.float32)
-#        plt.plot(self.xw[:,0],self.xw[:,1],".",label="#"+str(self.iteration))
+
+        #        plt.plot(self.xw[:,0],self.xw[:,1],".",label="#"+str(self.iteration))
 
 
         Ki,Li,Ui=genalias_init(self.w)

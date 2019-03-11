@@ -25,8 +25,8 @@ if __name__ == "__main__":
     # start ABCpmc 
     abc=ABCpmc()
     abc.maxtryx=10000000
-    abc.npart=512*16
-    abc.wide=10.0
+    abc.npart=512
+    abc.wide=2.0
     # input model/prior
     abc.nparam=1
     abc.model=\
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     abc.Ysm = np.array([Ysum])
     
     #set prior parameters
-    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2,1.e-3,1.e-4,1.e-5])
+    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2,1.e-3,1.e-4])
 
     #initial run of abc pmc
     abc.check_preparation()
@@ -88,8 +88,8 @@ if __name__ == "__main__":
     #plotting...
     fig=plt.figure(figsize=(10,5))
     ax=fig.add_subplot(211)
-    ax.hist(abc.x,bins=50,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-#    ax.hist(abc.xres(),bins=50,label="resampled",density=True,alpha=0.2)
+    ax.hist(abc.x,bins=30,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    ax.hist(abc.xres(),bins=30,label="resampled",density=True,alpha=0.2)
 
     alpha=alpha0+abc.nsample
     beta=beta0+Ysum
