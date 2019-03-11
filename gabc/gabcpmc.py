@@ -80,9 +80,9 @@ class ABCpmc(object):
         self.nwparam = None #dimension for weight computing (=nparam for normal, nhparam for hyper)
         
         self.ess = None # Effective Sample Size
-        self.Ecrit = 0.8 # critical ESS/npart for Resampling
+        self.Ecrit = 0.5 # critical ESS/npart for Resampling
         
-        self.wide=2.0
+        self.wide=10.0
         self.epsilon_list = False
         self.nthread_use_max=512 # maximun number of the threads in a block for use
 
