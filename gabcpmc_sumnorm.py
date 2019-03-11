@@ -102,7 +102,7 @@ if __name__ == "__main__":
     fig=plt.figure()
     ax=fig.add_subplot(211)
     ax.hist(abc.x,bins=300,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.3)
-    ax.hist(abc.xres(),bins=300,label="resampled",density=True,alpha=0.3)
+#    ax.hist(abc.xres(),bins=300,label="resampled",density=True,alpha=0.3)
     ax.plot(xref,0.5*normfunc.pdf(xref,0.0,1.0)+0.5*normfunc.pdf(xref,0.0,1.e-1))
     ax.legend()
     ax=fig.add_subplot(212)

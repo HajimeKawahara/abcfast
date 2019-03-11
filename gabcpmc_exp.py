@@ -26,14 +26,14 @@ if __name__ == "__main__":
     abc=ABCpmc()
     abc.maxtryx=10000000
     abc.npart=512*16
-
+    abc.wide=10.0
     # input model/prior
     abc.nparam=1
     abc.model=\
     """
     /* the exponential distribution model generator */
 
-    __device__ float model(float* Ysim, float* param, curandState* s){
+    __device__ void model(float* Ysim, float* param, curandState* s){
     
     Ysim[0] = -log(curand_uniform(s))/param[0];
 
@@ -63,15 +63,13 @@ if __name__ == "__main__":
     """
 
     # data and the summary statistics
-    abc.wide=10.0
     abc.nsample = len(Yobs)
     abc.ndata = 1
     Ysum = np.sum(Yobs)
     abc.Ysm = np.array([Ysum])
     
-    
     #set prior parameters
-    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2,1.e-3,1.e-4])
+    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2,1.e-3,1.e-4,1.e-5])
 
     #initial run of abc pmc
     abc.check_preparation()
@@ -88,16 +86,22 @@ if __name__ == "__main__":
     print(tend-tstart,"sec")
     
     #plotting...
-    plt.hist(abc.x,bins=200,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.hist(abc.xres(),bins=200,label="resampled",density=True,alpha=0.5)
+    fig=plt.figure(figsize=(10,5))
+    ax=fig.add_subplot(211)
+    ax.hist(abc.x,bins=50,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+#    ax.hist(abc.xres(),bins=50,label="resampled",density=True,alpha=0.2)
 
     alpha=alpha0+abc.nsample
     beta=beta0+Ysum
     xl = np.linspace(gammafunc.ppf(0.0001, alpha,scale=1.0/beta),gammafunc.ppf(0.9999, alpha,scale=1.0/beta), 100)
-    plt.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")
+    ax.plot(xl, gammafunc.pdf(xl, alpha, scale=1.0/beta),label="analytic")
     plt.xlabel("$\lambda$")
     plt.ylabel("$\pi_\mathrm{ABC}$")
     plt.legend()
+    ax=fig.add_subplot(212)
+    ax.plot(abc.x,abc.w,".")
+    plt.xlabel("$\lambda$")
+    plt.ylabel("$weight$")
     plt.savefig("abcpmc.png")
     plt.show()
 
