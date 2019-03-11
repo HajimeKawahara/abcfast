@@ -110,5 +110,5 @@ if __name__ == "__main__":
     plt.ylabel("weight")
     plt.xlim(-3,3)
     plt.ylim(0,np.max(abc.w))
-
+    plt.savefig("sumnorm.png")
     plt.show()

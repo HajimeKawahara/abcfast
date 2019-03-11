@@ -25,7 +25,7 @@ if __name__ == "__main__":
     # start ABCpmc 
     abc=ABCpmc()
     abc.maxtryx=10000000
-    abc.npart=512
+    abc.npart=512*16
 
     # input model/prior
     abc.nparam=1
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     """
 
     # data and the summary statistics
-    abc.wide=5.0
+    abc.wide=10.0
     abc.nsample = len(Yobs)
     abc.ndata = 1
     Ysum = np.sum(Yobs)
@@ -88,8 +88,8 @@ if __name__ == "__main__":
     print(tend-tstart,"sec")
     
     #plotting...
-    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.hist(abc.xres(),bins=20,label="resampled",density=True,alpha=0.5)
+    plt.hist(abc.x,bins=200,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.hist(abc.xres(),bins=200,label="resampled",density=True,alpha=0.5)
 
     alpha=alpha0+abc.nsample
     beta=beta0+Ysum
