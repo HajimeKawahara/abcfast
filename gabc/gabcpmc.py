@@ -10,13 +10,14 @@ import sys
 #self.x, self.xx : sampled hyperparameters for the hierarchical mode
 #
 
-def gabcpmc_module (model,prior,nparam,ndata,nsample,footer,nhparam=None,nsubject=None,nss=None,hyperprior=None,maxtryx=10000000):
+def gabcpmc_module (model,prior,nparam,ndata,nsample,nwparam,footer,nhparam=None,nsubject=None,nss=None,hyperprior=None,maxtryx=10000000):
     header=\
     "    #define NPARAM "+str(nparam)+"\n"\
     +"    #define NDATA "+str(ndata)+"\n"\
     +"    #define NSAMPLE "+str(nsample)+"\n"\
     +"    #define PNSAMPLE "+str(getptwo(nsample))+"\n"\
     +"    #define MAXTRYX "+str(maxtryx)+"\n"\
+    +"    #define NWPARAM "+str(nwparam)+"\n"\
     +"""
     #define CUDART_NAN_F __int_as_float(0x7fffffff)
     #include <stdio.h>
@@ -76,7 +77,8 @@ class ABCpmc(object):
         self._ndata = None # dimension of the data vector
         self._Ysm = None # summary statistics vector        
         self.nthread = None #number of threads    
-
+        self.nwparam = None #dimension for weight computing (=nparam for normal, nhparam for hyper)
+        
         #        self.nsm = None # dimension of the summary statistics vector
         
         self.wide=2.0
@@ -251,7 +253,8 @@ class ABCpmc(object):
     #include "abcpmc.h"
     #include "compute_weight.h"
     """
-            self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,footer,maxtryx=self.maxtryx)
+            self.nwparam = self._nparam
+            self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,self.nwparam,footer,maxtryx=self.maxtryx)
             
             self.pkernel_init=self.source_module.get_function("abcpmc_init")
             self.pkernel=self.source_module.get_function("abcpmc")
@@ -284,15 +287,16 @@ class ABCpmc(object):
     #include "habcpmc.h"
     #include "compute_weight.h"
 """            
-
+            
             nss=int(self._nsample/self._nsubject)
             if(self._nsample/self._nsubject - nss > 0.0):
                 print("nsubject=",self._nsubject,"nsample=",self._nsample)
                 sys.exit("Error: Invalid nsubject, nsample pair. nsample/nsubject must be integer (> 0).")                    
             self.nss = nss
-            self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,footer,\
-                                              nhparam=self._nhparam, nsubject=self._nsubject, nss=self.nss,\
-                                              hyperprior=self.hyperprior, maxtryx=self.maxtryx)
+            self.nwparam = self._nhparam
+            self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,\
+                                              self.nwparam,footer,nhparam=self._nhparam, nsubject=self._nsubject,\
+                                              nss=self.nss,hyperprior=self.hyperprior, maxtryx=self.maxtryx)
             self.pkernel_init=self.source_module.get_function("habcpmc_init")
             self.pkernel=self.source_module.get_function("habcpmc")
             self.wkernel=self.source_module.get_function("compute_weight")
@@ -330,6 +334,7 @@ class ABCpmc(object):
                 self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
+#                print("x(old)=>",self.x)
 
                 #update covariance
                 self.update_invcov()
@@ -338,10 +343,6 @@ class ABCpmc(object):
                 self.init_weight()
                 self.iteration = 1
             else:
-                #print("w=",self.w)
-                #print("hyperparm=",self.xw)
-                #print("cov=",self.invcov)
-                #print("Q=",self.Qmat)
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
                 self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
@@ -420,11 +421,14 @@ class ABCpmc(object):
         else:
             if self.hyper:
                 self.xw=np.copy(self.x).reshape(self._npart,self._nhparam)
-                cov = self.wide*np.cov(self.xw.transpose(),bias=True)
+                cov = self.wide*np.cov(self.xw.transpose(),bias=True)                
             else:
                 self.xw=np.copy(self.x).reshape(self._npart,self._nparam)
                 cov = self.wide*np.cov(self.xw.transpose(),bias=True)
             self.invcov = (np.linalg.inv(cov).flatten()).astype(np.float32)
+
+#            print("invcov=",self.invcov)
+#            print(np.linalg.det(self.invcov.reshape(2,2)))
             # Q matrix for multivariate Gaussian prior sampler
             [eigenvalues, eigenvectors] = np.linalg.eig(cov)
             l = np.matrix(np.diag(np.sqrt(eigenvalues)))
@@ -439,12 +443,13 @@ class ABCpmc(object):
         #update weight
         sharedsize=int(self._npart*4) #byte
         nthread=min(self._npart,self.nthread_use_max)
-        print("=>",self.xw)
+#        print("=>",self.xw)
+#        print("w=>",self.w)
+#        print("x(new)=>",self.x)
         
         self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, self.dev_invcov, block=(int(nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
         cuda.memcpy_dtoh(self.w, self.dev_ww)
-        print("=>",self.w)
         
         if self.hyper:
             if self._nhparam == 1:
@@ -456,14 +461,18 @@ class ABCpmc(object):
                 pri=self.fprior(self.x)
             else:
                 pri=self.fprior(self.xw)
+
+
+        #=====#
+#        tmp=np.max(self.w)/100
+#        mask=(self.w<tmp)
+#        self.w[mask]=tmp
+#        print("=>",self.w)
+
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
         self.w=self.w.astype(np.float32)
 
-        print(pri)
-
-        print(self.w)
-        sys.exit()
         Ki,Li,Ui=genalias_init(self.w)
         cuda.memcpy_htod(self.dev_Ki,Ki)
         cuda.memcpy_htod(self.dev_Li,Li)

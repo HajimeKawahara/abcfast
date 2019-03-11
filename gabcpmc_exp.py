@@ -63,7 +63,7 @@ if __name__ == "__main__":
     """
 
     # data and the summary statistics
-    abc.wide=5.0
+    abc.wide=2.0
     abc.nsample = len(Yobs)
     abc.ndata = 1
     Ysum = np.sum(Yobs)
