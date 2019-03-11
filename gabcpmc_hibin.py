@@ -7,6 +7,7 @@ if __name__ == "__main__":
     from numpy import random
     from scipy.stats import gamma as gammafunc
     from scipy.stats import norm as normfunc
+    from scipy.special import gamma as gammaform
 
     import time
     import sys
@@ -32,8 +33,8 @@ if __name__ == "__main__":
     print("data:",Ysum_obs)
     # start ABCpmc 
     abc=ABCpmc(hyper=True)
-    abc.maxtryx=100#debug magic
-    abc.npart=64#debug magic
+    abc.maxtryx=100000#debug magic
+    abc.npart=128#debug magic
 
     # input model/prior
     abc.nparam=1
@@ -45,13 +46,11 @@ if __name__ == "__main__":
     /* the exponential distribution model generator */
 
     __device__ void model(float* Ysim, float* param, curandState* s){
-    
     if (curand_uniform(s) <= param[0]){
     Ysim[0] = 1.0;
     }else{
     Ysim[0] = 0.0;
     }
-    
 
     }
     """
@@ -78,12 +77,13 @@ if __name__ == "__main__":
     ximu=100.0
     alphas=0.1
     betas=0.1
-    # hyperprior functional form hyperparameter = (mu,log(sigma))
+    # hyperprior functional form (PDF) hyperparameter = (mu,log(sigma))
     def fhprior():
         def f(x):
             h0=normfunc.pdf(x[:,0],loc=mumu,scale=np.sqrt(ximu) )
-            h1=np.log10(1.0/gammafunc.pdf(x[:,1], alphas,scale=1.0/betas))
-            return np.array([h0,h1])
+            sigma=np.exp(x[:,1])
+            h1=(betas**alphas)/gammaform(alphas)*((1.0/sigma)**(alphas+1.0))*np.exp(-betas/sigma)
+            return h0*h1
         return f
     abc.fhprior = fhprior()#
 
@@ -108,24 +108,18 @@ if __name__ == "__main__":
     
     
     #set prior parameters
-    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-3,1.e-4,1.e-5])
-
+    abc.epsilon_list = np.array([3.0,2.0,1.0,0.9])
+    fig=plt.figure()
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
     abc.check()
-
+    
+    plt.plot(abc.xw[:,0],abc.xw[:,1],"+",label="#0")
+    
     #plot 0
     xw0=np.copy(abc.xw)
 
-    fig=plt.figure()
-    ax=fig.add_subplot(121)
-    ax.hist(xw0[:,0][xw0[:,0]<1000],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.xlabel("mu")
-
-    ax2=fig.add_subplot(122)
-    ax2.hist(xw0[:,1],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.xlabel("log sigma")
 
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
@@ -136,6 +130,17 @@ if __name__ == "__main__":
     print(tend-tstart,"sec")
 
     xw0=np.copy(abc.xw)
+
+
+    fig=plt.figure()
+    ax=fig.add_subplot(121)
+    ax.hist(xw0[:,0][xw0[:,0]<1000],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.xlabel("mu")
+
+    ax2=fig.add_subplot(122)
+    ax2.hist(xw0[:,1],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.xlabel("log sigma")
+
     ax.hist(xw0[:,0][xw0[:,0]<1000],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
     ax2=fig.add_subplot(122)
     ax2.hist(xw0[:,1],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)

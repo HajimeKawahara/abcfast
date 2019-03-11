@@ -4,7 +4,7 @@ import pycuda.compiler
 from pycuda.compiler import SourceModule
 from gabc.utils.statutils import *
 import sys
-
+import matplotlib.pyplot as plt #remove
 #Note:
 #self.x, self.xx : sampled parameters for the normal mode
 #self.x, self.xx : sampled hyperparameters for the hierarchical mode
@@ -338,7 +338,6 @@ class ABCpmc(object):
 
                 #update covariance
                 self.update_invcov()
-
                 #update weight
                 self.init_weight()
                 self.iteration = 1
@@ -348,8 +347,9 @@ class ABCpmc(object):
                 self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
+
                 #update covariance
-                self.update_invcov()
+                self.update_invcov()                
                 #update weight
                 self.update_weight()
                 #swap
@@ -427,14 +427,28 @@ class ABCpmc(object):
                 cov = self.wide*np.cov(self.xw.transpose(),bias=True)
             self.invcov = (np.linalg.inv(cov).flatten()).astype(np.float32)
 
-#            print("invcov=",self.invcov)
-#            print(np.linalg.det(self.invcov.reshape(2,2)))
             # Q matrix for multivariate Gaussian prior sampler
-            [eigenvalues, eigenvectors] = np.linalg.eig(cov)
-            l = np.matrix(np.diag(np.sqrt(eigenvalues)))
-            Q = np.matrix(eigenvectors) * l
-            self.Qmat=(Q.flatten()).astype(np.float32)
+            try:
+                [eigenvalues, eigenvectors] = np.linalg.eig(cov)
+                l = np.matrix(np.diag(np.sqrt(np.abs(eigenvalues))))
+                Q = np.matrix(eigenvectors) * l
+                self.Qmat=(Q.flatten()).astype(np.float32)
+                print("cov=",cov)
+                print("eigen=",eigenvalues)
+                print("l=",l)
+                print("Qmat(py)",Q)
+            except:
+                plt.legend()
+                plt.show()
+                print(self.x)
+                print(cov)
 
+                [eigenvalues, eigenvectors] = np.linalg.eig(cov)
+                l = np.matrix(np.diag(np.sqrt(np.abs(eigenvalues))))
+                Q = np.matrix(eigenvectors) * l
+                self.Qmat=(Q.flatten()).astype(np.float32)
+
+                
         cuda.memcpy_htod(self.dev_invcov,self.invcov)
         cuda.memcpy_htod(self.dev_Qmat,self.Qmat)
         
@@ -443,14 +457,8 @@ class ABCpmc(object):
         #update weight
         sharedsize=int(self._npart*4) #byte
         nthread=min(self._npart,self.nthread_use_max)
-#        print("=>",self.xw)
-#        print("w=>",self.w)
-#        print("x(new)=>",self.x)
-        
         self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, self.dev_invcov, block=(int(nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
-
         cuda.memcpy_dtoh(self.w, self.dev_ww)
-        
         if self.hyper:
             if self._nhparam == 1:
                 pri=self.fhprior(self.x)
@@ -462,16 +470,11 @@ class ABCpmc(object):
             else:
                 pri=self.fprior(self.xw)
 
-
-        #=====#
-#        tmp=np.max(self.w)/100
-#        mask=(self.w<tmp)
-#        self.w[mask]=tmp
-#        print("=>",self.w)
-
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
         self.w=self.w.astype(np.float32)
+        plt.plot(self.xw[:,0],self.xw[:,1],".",label="#"+str(self.iteration))
+
 
         Ki,Li,Ui=genalias_init(self.w)
         cuda.memcpy_htod(self.dev_Ki,Ki)
