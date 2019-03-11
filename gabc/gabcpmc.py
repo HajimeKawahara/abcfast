@@ -428,25 +428,20 @@ class ABCpmc(object):
             self.invcov = (np.linalg.inv(cov).flatten()).astype(np.float32)
 
             # Q matrix for multivariate Gaussian prior sampler
-            try:
-                [eigenvalues, eigenvectors] = np.linalg.eig(cov)
-                l = np.matrix(np.diag(np.sqrt(np.abs(eigenvalues))))
-                Q = np.matrix(eigenvectors) * l
-                self.Qmat=(Q.flatten()).astype(np.float32)
-                print("cov=",cov)
-                print("eigen=",eigenvalues)
-                print("l=",l)
-                print("Qmat(py)",Q)
-            except:
-                plt.legend()
-                plt.show()
-                print(self.x)
-                print(cov)
+            [eigenvalues, eigenvectors] = np.linalg.eig(cov)
+            l = np.matrix(np.diag(np.sqrt(np.abs(eigenvalues))))
+            Q = np.matrix(eigenvectors) * l
+            self.Qmat=(Q.flatten()).astype(np.float32)
+#                print("cov=",cov)
+#                print("eigen=",eigenvalues)
+#                print("l=",l)
+#                print("Qmat(py)",Q)
+#            except:
+#                plt.legend()
+#                plt.show()
+#                print(self.x)
+#                print(cov)
 
-                [eigenvalues, eigenvectors] = np.linalg.eig(cov)
-                l = np.matrix(np.diag(np.sqrt(np.abs(eigenvalues))))
-                Q = np.matrix(eigenvectors) * l
-                self.Qmat=(Q.flatten()).astype(np.float32)
 
                 
         cuda.memcpy_htod(self.dev_invcov,self.invcov)
@@ -473,7 +468,7 @@ class ABCpmc(object):
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
         self.w=self.w.astype(np.float32)
-        plt.plot(self.xw[:,0],self.xw[:,1],".",label="#"+str(self.iteration))
+#        plt.plot(self.xw[:,0],self.xw[:,1],".",label="#"+str(self.iteration))
 
 
         Ki,Li,Ui=genalias_init(self.w)
