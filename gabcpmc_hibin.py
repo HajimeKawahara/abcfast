@@ -33,13 +33,14 @@ if __name__ == "__main__":
     print("data:",Ysum_obs)
     # start ABCpmc 
     abc=ABCpmc(hyper=True)
-    abc.maxtryx=100000#debug magic
-    abc.npart=128#debug magic
+    abc.maxtryx=1000000#debug magic
+    abc.npart=512#debug magic
 
     # input model/prior
     abc.nparam=1
     abc.nsubject = nsub
     abc.nsample = nsample
+    abc.Ecrit=0.0 #resampling off
 
     abc.model=\
     """
@@ -63,8 +64,10 @@ if __name__ == "__main__":
     float logitp;
     float el;
     logitp = normf(hparam[0],exp(hparam[1]),s);
+    
     /* exp(18)(1+exp(18)) = 1.00000 effectively */
     el = min(18.0,logitp);
+
     el = exp(el);
     param[0] = el/(1.0 + el);
     
@@ -108,15 +111,12 @@ if __name__ == "__main__":
     
     
     #set prior parameters
-    abc.epsilon_list = np.array([3.0,2.0,1.0,0.9])
-    fig=plt.figure()
+    abc.epsilon_list = np.array([0.1,0.05,0.03,0.01,0.005])*10.0
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
     abc.check()
-    
-    plt.plot(abc.xw[:,0],abc.xw[:,1],"+",label="#0")
-    
+        
     #plot 0
     xw0=np.copy(abc.xw)
 
@@ -133,17 +133,13 @@ if __name__ == "__main__":
 
 
     fig=plt.figure()
-    ax=fig.add_subplot(121)
-    ax.hist(xw0[:,0][xw0[:,0]<1000],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.xlabel("mu")
-
-    ax2=fig.add_subplot(122)
-    ax2.hist(xw0[:,1],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.xlabel("log sigma")
-
-    ax.hist(xw0[:,0][xw0[:,0]<1000],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    ax2=fig.add_subplot(122)
-    ax2.hist(xw0[:,1],bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    ax=fig.add_subplot(111)
+    cl=ax.scatter(abc.xw[:,0],abc.xw[:,1],c=abc.w,alpha=0.5)
+    plt.colorbar(cl)
+    plt.xlim(-3,2)
+    plt.ylim(-3.5,2)
+    plt.xlabel("$\mu$")
+    plt.ylabel("log $\sigma$")
 
     #plot Np-1
     plt.show()

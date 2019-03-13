@@ -14,7 +14,7 @@ if __name__ == "__main__":
     
     print("*******************************************")
     print("GPU ABC PMC Method.")
-    print("This code demonstrates a normal+normal distribution.")
+    print("This code demonstrates a normal+normal distribution. Beaumont+2009")
     print("*******************************************")
 
     #preparing data
@@ -23,6 +23,8 @@ if __name__ == "__main__":
 
     # start ABCpmc 
     abc=ABCpmc()
+    abc.wide=2.0
+    abc.Ecrit=0.1
     abc.maxtryx=100000#debug magic
     abc.npart=512*16#debug magic
 
@@ -36,7 +38,7 @@ if __name__ == "__main__":
     __device__ float model(float* Ysim, float* param, curandState* s){
     
     float cl=curand_uniform(s);
-    int i=int(cl*2.0-0.0000001);
+    int i=int(cl*2.0);
     float siga[2];
     siga[0]=1.0;
     siga[1]=1.e-1;
@@ -47,8 +49,6 @@ if __name__ == "__main__":
     """
     
     # prior 
-    alpha0=0.1
-    beta0=0.1
     def fprior():
         def f(x):
             mask=(x<10.0)*(x>-10.0)
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     
     
     #set prior parameters
-    abc.epsilon_list = np.array([3.0,1.0,1.e-1,1.e-2])
+    abc.epsilon_list = np.array([2.0,1.5,1.0,0.5,1.e-2])
 
     #initial run of abc pmc
     abc.check_preparation()
@@ -101,9 +101,9 @@ if __name__ == "__main__":
     #plotting...
     fig=plt.figure()
     ax=fig.add_subplot(211)
-    ax.hist(abc.x,bins=300,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.3)
+    ax.hist(abc.x,bins=200,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.3)
 
-    ax.hist(abc.xres(),bins=300,label="resampled",density=True,alpha=0.3)
+    ax.hist(abc.xres(),bins=200,label="resampled",density=True,alpha=0.1)
     ax.plot(xref,0.5*normfunc.pdf(xref,0.0,1.0)+0.5*normfunc.pdf(xref,0.0,1.e-1))
     ax.legend()
     ax=fig.add_subplot(212)

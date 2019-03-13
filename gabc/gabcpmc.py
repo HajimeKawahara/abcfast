@@ -343,6 +343,7 @@ class ABCpmc(object):
                 self.init_weight()
                 self.iteration = 1
             else:
+                
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
                 self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
@@ -458,10 +459,16 @@ class ABCpmc(object):
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)
         self.ess=1.0/(np.linalg.norm(self.w)**2)
+
         print("ESS=",self.ess,"Npart=",self._npart)
         if self.ess < self.Ecrit*self._npart:
             print("Resampling.")
-            self.x=np.random.choice(self.x,self._npart,p=self.w)
+
+            if len(self.x) == self._npart:
+                self.x=np.random.choice(self.x,self._npart,p=self.w)
+            else:
+                index=np.random.choice(len(self.w),self._npart,p=self.w)
+                self.x=self.xw[index,:].flatten()
             self.w=np.ones(self._npart)
             self.w=self.w/np.sum(self.w)
             
