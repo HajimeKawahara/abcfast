@@ -33,14 +33,14 @@ if __name__ == "__main__":
     print("data:",Ysum_obs)
     # start ABCpmc 
     abc=ABCpmc(hyper=True)
-    abc.maxtryx=1000000#debug magic
+    abc.maxtryx=100000000#debug magic
     abc.npart=512#debug magic
 
     # input model/prior
     abc.nparam=1
     abc.nsubject = nsub
     abc.nsample = nsample
-    abc.Ecrit=0.0 #resampling off
+#    abc.Ecrit=0.0 #resampling off
 
     abc.model=\
     """
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     
     abc.wide=2.0
     #set prior parameters
-    abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.07,0.06,0.03])
+    abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.07,0.06,0.05,0.03,0.02])
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
@@ -132,20 +132,26 @@ if __name__ == "__main__":
     xw0=np.copy(abc.xw)
 
 
-    fig=plt.figure()
-    ax=fig.add_subplot(121)
-    ax.hist(abc.z,bins=100,alpha=0.3,color="gray")
-    plt.ylabel("p")
-    for ip in ptrue:
-        plt.axvline(ip,ls="dashed")
+    fig=plt.figure(figsize=(10,5))
+
+    ax=fig.add_subplot(121)    
+    #    ax.hist(abc.z,bins=100,alpha=0.3,color="gray")    
+    for isub in range(0,abc.nsubject):
+        ax.hist(abc.zw[:,isub],bins=30,alpha=0.3,label="subject #"+str(isub),color="C"+str(isub))
+    plt.xlabel("p")
+    plt.legend()
+    for j,ip in enumerate(ptrue):
+        plt.axvline(ip,ls="dashed",color="C"+str(j))
     ax=fig.add_subplot(122)
-    cl=ax.scatter(abc.xw[:,0],abc.xw[:,1],c=abc.w,alpha=0.5)
+    cl=ax.scatter(abc.xw[:,0],abc.xw[:,1],c=abc.w,alpha=0.2)
     plt.colorbar(cl)
     plt.xlim(-3,2)
     plt.ylim(-3.5,2)
+    plt.axhline(np.log(0.5))
+    plt.axvline(-1.0)
     plt.xlabel("$\mu$")
     plt.ylabel("log $\sigma$")
-
+    plt.savefig("hibin.png")
     #plot Np-1
     plt.show()
 

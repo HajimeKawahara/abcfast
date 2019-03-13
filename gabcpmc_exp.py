@@ -25,7 +25,7 @@ if __name__ == "__main__":
     # start ABCpmc 
     abc=ABCpmc()
     abc.maxtryx=10000000
-    abc.npart=512
+    abc.npart=1024
     abc.wide=2.0
     # input model/prior
     abc.nparam=1

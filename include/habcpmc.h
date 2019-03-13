@@ -234,9 +234,16 @@ extern "C"{
 	    x[NHPARAM*iblock + ithread] = hparam[ithread];
 	}
 
-	if(ithread<NPARAM){
-	    z[NPARAM*iblock + ithread] = param[ithread];
-	}
+	for (int k=0; k<int(float(NSUBJECT-1)/float(nthread))+1; k++){
+	  isubject = k*nthread + ithread;
+
+	  if(isubject < NSUBJECT){
+	    for (int m=0; m<NPARAM; m++){
+	    z[NPARAM*NSUBJECT*iblock + NPARAM*isubject + m] = cache[NDATA*NSAMPLE+NHPARAM+isubject*NPARAM + m];
+	    }
+	  }	  
+	}	
+
 	
 	if(ithread==0){	
 	  ntry[iblock]=cnt;

@@ -121,7 +121,10 @@ class ABCpmc(object):
             self.hyper = True
             self._nsubject = None # number of subject
             self.nss = None # number of observation per subject
-            self.dev_z = None # output for model parameter sampling
+            self.z = None # output for model parameter sampling
+            self.dev_z = None # output for model parameter sampling (device)
+            self.zw = None
+            
             self._nhparam = None
             self._hyperprior = None
 #            self._parhyper = None
@@ -304,7 +307,7 @@ class ABCpmc(object):
             
             self.x,self.dev_x=setmem_device(self._npart*self._nhparam,np.float32)
             self.xx,self.dev_xx=setmem_device(self._npart*self._nhparam,np.float32)
-            self.z,self.dev_z=setmem_device(self._npart*self._nparam,np.float32)
+            self.z,self.dev_z=setmem_device(self._npart*self._nparam*self.nsubject,np.float32)
 
             self.ntry,self.dev_ntry=setmem_device(self._npart,np.int32)
             self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
@@ -352,7 +355,7 @@ class ABCpmc(object):
 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
                 cuda.memcpy_dtoh(self.z, self.dev_z)
-
+                
                 #update covariance
                 self.update_invcov()                
                 #update weight
@@ -425,6 +428,7 @@ class ABCpmc(object):
             self.Qmat = np.array([np.sqrt(cov)]).astype(np.float32)
         else:
             if self.hyper:
+                self.zw=self.z.reshape((self._npart,self._nsubject))
                 self.xw=np.copy(self.x).reshape(self._npart,self._nhparam)
                 cov = self.wide*np.cov(self.xw.transpose(),bias=True)                
             else:

@@ -34,13 +34,6 @@ ABC posteriors for different tolerance thresholds. The summary statistics is s=|
 
 - gabcpmc_sumnorm.py demonstrating a gaussian+gaussian case (Beaumont+09). 
 
-
-# Random number generators using curand_kernel.h
-
-Directory: random_gen
-
-- uniform, normal, 2D normal, gamma distribution, beta distribution, binomial distribution, random choise with discrete probability p_i (the alias method).
-
 # Customizing ABC-PMC
 
 You need to prepare
@@ -62,9 +55,21 @@ c based or prepared python function
 ### fprior
 a prior density distribution to compute weights, python function
 
+
 # Hierarchical ABC
 
 - gabcpmc_hibin.py  demonstrating an exponential example in Section 6 of [Turner and Van Zandt (2012) JMP 56, 69](https://www.sciencedirect.com/science/article/abs/pii/S0022249612000272?via%3Dihub). Still super unstable though.
+
+<img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/hibin.png" Titie="explanation" Width=750px>
+
+
+
+# Random number generators using curand_kernel.h
+
+Directory: random_gen
+
+- uniform, normal, 2D normal, gamma distribution, beta distribution, binomial distribution, random choise with discrete probability p_i (the alias method).
+
 
 # Current Status
 
