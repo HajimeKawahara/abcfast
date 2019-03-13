@@ -27,7 +27,7 @@ k= +NDATA*NSAMPLE for sumulated data Ysim, +NHPARAM for the prior parmeters, +NS
 #include "genalias.h"
 
 extern "C"{
-  __global__ void habcpmc(float* x, float* xprev, float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float* Qmat, int seed, float* dist, int* ntry){
+  __global__ void habcpmc(float* x, float* xprev, float* z,float* Ysm, float epsilon, int* Ki, int* Li, float* Ui, float* Qmat, int seed, float* dist, int* ntry){
 
     curandState s;
     int cnt = 0;
@@ -233,6 +233,11 @@ extern "C"{
 	if(ithread<NHPARAM){
 	    x[NHPARAM*iblock + ithread] = hparam[ithread];
 	}
+
+	if(ithread<NPARAM){
+	    z[NPARAM*iblock + ithread] = param[ithread];
+	}
+	
 	if(ithread==0){	
 	  ntry[iblock]=cnt;
 	  dist[iblock]=rho;

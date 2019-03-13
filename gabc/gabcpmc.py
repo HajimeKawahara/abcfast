@@ -121,7 +121,7 @@ class ABCpmc(object):
             self.hyper = True
             self._nsubject = None # number of subject
             self.nss = None # number of observation per subject
-
+            self.dev_z = None # output for model parameter sampling
             self._nhparam = None
             self._hyperprior = None
 #            self._parhyper = None
@@ -304,6 +304,8 @@ class ABCpmc(object):
             
             self.x,self.dev_x=setmem_device(self._npart*self._nhparam,np.float32)
             self.xx,self.dev_xx=setmem_device(self._npart*self._nhparam,np.float32)
+            self.z,self.dev_z=setmem_device(self._npart*self._nparam,np.float32)
+
             self.ntry,self.dev_ntry=setmem_device(self._npart,np.int32)
             self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
             self.invcov,self.dev_invcov=setmem_device(self._nhparam*self._nhparam,np.float32)
@@ -346,9 +348,10 @@ class ABCpmc(object):
                 
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
-                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
-                
+                self.pkernel(self.dev_xx,self.dev_x,self.dev_z,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
+                cuda.memcpy_dtoh(self.z, self.dev_z)
 
                 #update covariance
                 self.update_invcov()                
