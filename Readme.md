@@ -1,6 +1,6 @@
 <img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/logo.png" Titie="explanation" Width=150px>
 
-GPU Approximate Baysian Computation. Under development.
+GPU Approximate Bayesian Computation. Under development.
 
 # setting
 
