@@ -75,37 +75,25 @@ extern "C"{
 	isel=aliasgen(Ki, Li, Ui, npart,&s);
 	for (int m=0; m<NHPARAM; m++){
 	  rn[m] = curand_normal(&s);
+	  /* rn[m]=0.0; */
 	}
 	
 	for (int m=0; m<NHPARAM; m++){
 	  hparam[m]=xprev[NHPARAM*isel+m];
 
 	  for (int k=0; k<NHPARAM; k++){
-	    hparam[m] += Qmat[m*NHPARAM+k]*rn[k];
-	    
-	  }
-	  
+	    hparam[m] += Qmat[m*NHPARAM+k]*rn[k];	    
+	  }	  
 	  cache[NDATA*NSAMPLE+m] = hparam[m];
 	}
       }
       __syncthreads();
 
-      /* ===================================================== */
-      /* sampling from a hyper prior, getting the hyperparameter (x NHPARAM elements) */
-      if(ithread == 0){
-	hyperprior(hparam, &s);
-	for (int m=0; m<NHPARAM; m++){
-	  cache[NDATA*NSAMPLE+m] = hparam[m];
-	}
-      }
-      __syncthreads();
-      /* ===================================================== */
 
       /* loading hyperparameters for each thread s*/
       for (int m=0; m<NHPARAM; m++){
 	hparam[m] = cache[NDATA*NSAMPLE+m];
       }
-
       
       /* sampling from a prior, getting NSUBJECT sets of the model parameters (x NHPARAM elements) */
       for (int k=0; k<int(float(NSUBJECT-1)/float(nthread))+1; k++){

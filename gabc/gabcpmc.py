@@ -340,7 +340,6 @@ class ABCpmc(object):
                 self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
-#                print("x(old)=>",self.x)
 
                 #update covariance
                 self.update_invcov()
@@ -355,11 +354,14 @@ class ABCpmc(object):
 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
                 cuda.memcpy_dtoh(self.z, self.dev_z)
-                
+#                print("x(old)=>",np.sum(self.x))
                 #update covariance
                 self.update_invcov()                
+#                print("invcov=",self.invcov)
+
                 #update weight
                 self.update_weight()
+                print("weight",self.w)
                 #swap
                 self.dev_x, self.dev_xx = self.dev_xx, self.dev_x
                 self.dev_w, self.dev_ww = self.dev_ww, self.dev_w
@@ -424,6 +426,7 @@ class ABCpmc(object):
         #inverse covariance matrix
         if self.onedim:
             cov = self.wide*np.var(self.x)
+            self.cov = cov
             self.invcov = np.array(1.0/cov).astype(np.float32)
             self.Qmat = np.array([np.sqrt(cov)]).astype(np.float32)
         else:
@@ -434,8 +437,9 @@ class ABCpmc(object):
             else:
                 self.xw=np.copy(self.x).reshape(self._npart,self._nparam)
                 cov = self.wide*np.cov(self.xw.transpose(),bias=True)
+            self.cov = cov 
             self.invcov = (np.linalg.inv(cov).flatten()).astype(np.float32)
-
+            
             # Q matrix for multivariate Gaussian prior sampler
             [eigenvalues, eigenvectors] = np.linalg.eig(cov)
             l = np.matrix(np.diag(np.sqrt(np.abs(eigenvalues))))
@@ -452,6 +456,7 @@ class ABCpmc(object):
         nthread=min(self._npart,self.nthread_use_max)
         self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, self.dev_invcov, block=(int(nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
         cuda.memcpy_dtoh(self.w, self.dev_ww)
+#        print("w=",self.w)
         if self.hyper:
             if self._nhparam == 1:
                 pri=self.fhprior(self.x)
@@ -462,6 +467,7 @@ class ABCpmc(object):
                 pri=self.fprior(self.x)
             else:
                 pri=self.fprior(self.xw)
+#        print("pri=",pri)
 
         self.w=pri/self.w
         self.w=self.w/np.sum(self.w)

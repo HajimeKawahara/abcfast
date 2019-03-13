@@ -40,7 +40,7 @@ if __name__ == "__main__":
     abc.nparam=1
     abc.nsubject = nsub
     abc.nsample = nsample
-#    abc.Ecrit=0.0 #resampling off
+    abc.Ecrit=0.0 #resampling off
 
     abc.model=\
     """
@@ -86,6 +86,11 @@ if __name__ == "__main__":
             h0=normfunc.pdf(x[:,0],loc=mumu,scale=np.sqrt(ximu) )
             sigma=np.exp(x[:,1])
             h1=(betas**alphas)/gammaform(alphas)*((1.0/sigma)**(alphas+1.0))*np.exp(-betas/sigma)
+            mask=(h1!=h1)
+            h1[mask]=np.nanmedian(h1)
+#            if np.sum(h1) != np.sum(h1):
+#                print(x[mask,:])
+#                sys.exit("OUT!")
             return h0*h1
         return f
     abc.fhprior = fhprior()#
@@ -111,7 +116,7 @@ if __name__ == "__main__":
     
     abc.wide=2.0
     #set prior parameters
-    abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.07,0.06,0.05,0.03,0.02])
+    abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.07,0.06,0.05,0.03,0.02,0.01])
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
@@ -125,7 +130,6 @@ if __name__ == "__main__":
     for eps in abc.epsilon_list[1:]:
         abc.run()
         abc.check()
-
     tend = time.time()
     print(tend-tstart,"sec")
 
