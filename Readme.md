@@ -32,6 +32,9 @@ ABC posteriors for different tolerance thresholds. The summary statistics is s=|
 
 <img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/abcpmc_norm2d.png" Titie="explanation" Width=750px>
 
+- gabcpmc_sumnorm.py demonstrating a gaussian+gaussian case (Beaumont+09). 
+
+
 # Random number generators using curand_kernel.h
 
 Directory: random_gen
@@ -61,7 +64,7 @@ a prior density distribution to compute weights, python function
 
 # Hierarchical ABC
 
- in preparation
+- gabcpmc_hibin.py  demonstrating an exponential example in Section 6 of [Turner and Van Zandt (2012) JMP 56, 69](https://www.sciencedirect.com/science/article/abs/pii/S0022249612000272?via%3Dihub). Still super unstable though.
 
 # Current Status
 
