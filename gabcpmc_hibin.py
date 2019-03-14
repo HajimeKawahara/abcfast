@@ -35,7 +35,6 @@ if __name__ == "__main__":
     abc=ABCpmc(hyper=True)
     abc.maxtryx=100000000#debug magic
     abc.npart=512#debug magic
-
     # input model/prior
     abc.nparam=1
     abc.nsubject = nsub
@@ -113,7 +112,7 @@ if __name__ == "__main__":
     
     abc.wide=2.0
     #set prior parameters
-    abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.07,0.06,0.05,0.03,0.02])
+    abc.epsilon_list = np.array([1.0,0.5,0.3,0.1,0.07,0.06,0.05,0.03,0.02,0.01,0.005])
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
