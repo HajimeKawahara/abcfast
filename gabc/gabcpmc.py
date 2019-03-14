@@ -361,7 +361,7 @@ class ABCpmc(object):
 
                 #update weight
                 self.update_weight()
-                print("weight",self.w)
+                #print("weight",self.w)
                 #swap
                 self.dev_x, self.dev_xx = self.dev_xx, self.dev_x
                 self.dev_w, self.dev_ww = self.dev_ww, self.dev_w

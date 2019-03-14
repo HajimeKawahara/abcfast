@@ -84,8 +84,9 @@ extern "C"{
 	  for (int k=0; k<NHPARAM; k++){
 	    hparam[m] += Qmat[m*NHPARAM+k]*rn[k];	    
 	  }	  
-	  cache[NDATA*NSAMPLE+m] = hparam[m];
+	  cache[NDATA*NSAMPLE+m] = hparam[m];	  
 	}
+	/*	printf("%2.8f,%2.8f\n",hparam[0],hparam[1]); */
       }
       __syncthreads();
 
