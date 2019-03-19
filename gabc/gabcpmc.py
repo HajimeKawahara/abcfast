@@ -68,7 +68,7 @@ class ABCpmc(object):
     def __init__(self,hyper=False):
             
         self.maxtryx = 10000000 #MAXTRYX reduce this value when you debug the code.
-        self.nthread_max = 1024 #MAX NUMBER OF THREADS IN A BLOCK
+        self.nthread_use_max = 1024 #MAX NUMBER OF THREADS IN A BLOCK
 
         self._npart = 512  # number of the particles (default=512)
         self._nparam = None    # dimension of parameters in the model
@@ -83,7 +83,7 @@ class ABCpmc(object):
         
         self.wide=10.0
         self.epsilon_list = False
-        self.nthread_use_max=512 # maximun number of the threads in a block for use
+#        self.nthread_use_max=512 # maximun number of the threads in a block for use
 
         self.x=None
         self.xw = None #(npart,nparam)-dimension array type of x
@@ -269,7 +269,7 @@ class ABCpmc(object):
             self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
             self.invcov,self.dev_invcov=setmem_device(self._nparam*self._nparam,np.float32)
             self.Qmat,self.dev_Qmat=setmem_device(self._nparam*self._nparam,np.float32)
-            self.nthread = min(self.nthread_max,self._nsample)
+            self.nthread = min(self.nthread_use_max,self._nsample)
             self.prepare = True
 
             if self._nparam == 1:
@@ -312,7 +312,7 @@ class ABCpmc(object):
             self.dist,self.dev_dist=setmem_device(self._npart,np.float32)
             self.invcov,self.dev_invcov=setmem_device(self._nhparam*self._nhparam,np.float32)
             self.Qmat,self.dev_Qmat=setmem_device(self._nhparam*self._nhparam,np.float32)
-            self.nthread = min(self.nthread_max,self._nsample)
+            self.nthread = min(self.nthread_use_max,self._nsample)
             self.prepare = True
 
             if self._nhparam == 1:
