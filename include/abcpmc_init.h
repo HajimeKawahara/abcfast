@@ -21,7 +21,7 @@ k= +NDATA*NSAMPLE for sumulated data Ysim, +NPARAM for the model parameters
 
 
 extern "C"{
-  __global__ void abcpmc_init(float* x, float* Ysm, float epsilon, int seed, float* dist, int* ntry){
+  __global__ void abcpmc_init(float* x, float* Ysm, float epsilon, int seed, float* dist, int* ntry, float* aux){
 
     curandState s;
     int cnt = 0;
@@ -74,7 +74,7 @@ extern "C"{
 	isample = p*nthread + ithread;
 	if (isample < NSAMPLE){	  	  
 
-	  model(Ysim, param, &s);	  
+	  model(Ysim, param, &s, aux);	  
 	  for (int m=0; m<NDATA; m++){
 	    cache[NDATA*isample+m] = Ysim[m];	    
 	  }

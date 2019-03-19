@@ -30,6 +30,8 @@ if __name__ == "__main__":
 
     # input model/prior
     abc.nparam=1
+
+    abc.aux=np.array([0.1,1.0])
     abc.model=\
     """
     /* the double normal distribution model generator */
@@ -39,11 +41,7 @@ if __name__ == "__main__":
     
     float cl=curand_uniform(s);
     int i=int(cl*2.0);
-    float siga[2];
-    siga[0]=1.0;
-    siga[1]=1.e-1;
-
-    Ysim[0] =  normf(param[0],siga[i], s);
+    Ysim[0] =  normf(param[0],aux[i], s);
 
     }
     """

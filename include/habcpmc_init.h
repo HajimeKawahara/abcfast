@@ -46,7 +46,6 @@ extern "C"{
     
     for ( ; ; ){
 
-
     /* limitter */
       cnt++;
       if(cnt > MAXTRYX){

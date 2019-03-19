@@ -57,6 +57,8 @@ ABC posteriors for different tolerance thresholds. The summary statistics is s=|
 <img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/abcpmc_norm2d.png" Titie="explanation" Width=750px>
 
 - gabcpmc_sumnorm.py demonstrating a gaussian+gaussian case (Beaumont+09). 
+- gabcpmc_sumnorm_useaux.py same as the above, but an example to use aux parameters stacked in the global memory.
+
 
 ## Customizing the ABC-PMC
 

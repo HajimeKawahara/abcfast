@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     /* the exponential distribution model generator */
 
-    __device__ void model(float* Ysim,float* param,  curandState* s){
+    __device__ void model(float* Ysim,float* param,  curandState* s, float* aux){
 
     Ysim[0] = normf(param[0],0.25,s);
     Ysim[1] = normf(param[1],0.25,s);

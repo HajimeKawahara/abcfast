@@ -52,7 +52,7 @@ def gabcpmc_module (model,prior,nparam,ndata,nsample,nwparam,footer,nhparam=None
     else:
         print(header+model+prior+footer)
         source_module = SourceModule(header+model+prior+footer,options=['-use_fast_math'],no_extern_c=True)
-
+        
     return source_module
 
 
@@ -75,6 +75,7 @@ class ABCpmc(object):
         self._nsample = None # number of the data vector
         self._ndata = None # dimension of the data vector
         self._Ysm = None # summary statistics vector        
+
         self.nthread = None #number of threads    
         self.nwparam = None #dimension for weight computing (=nparam for normal, nhparam for hyper)
         
@@ -98,6 +99,9 @@ class ABCpmc(object):
         self.dev_invcov = None
         self.Qmat = None
         self.dev_Qmat = None
+        self.aux = None
+        self.dev_aux = None
+
         
         self.iteration = 0
         self.epsilon = None
@@ -249,7 +253,6 @@ class ABCpmc(object):
            and self._prior is not None and self._npart is not None \
            and self._nparam is not None and self._ndata is not None \
            and self._nsample is not None:
-            
             footer=\
     """
     #include "abcpmc_init.h"
@@ -257,6 +260,14 @@ class ABCpmc(object):
     #include "compute_weight.h"
     """
             self.nwparam = self._nparam
+            if self.aux is None:
+                self.aux,self.dev_aux=setmem_device(1,np.float32)
+            else:
+                self.aux=self.aux.astype(np.float32)
+                self.dev_aux = cuda.mem_alloc(self.aux.nbytes)        
+                cuda.memcpy_htod(self.dev_aux,self.aux)
+
+                
             self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,self.nwparam,footer,maxtryx=self.maxtryx)
             
             self.pkernel_init=self.source_module.get_function("abcpmc_init")
@@ -327,8 +338,11 @@ class ABCpmc(object):
         self._Ysm = Ysm.astype(np.float32)
         self.dev_Ysm = cuda.mem_alloc(self._Ysm.nbytes)        
         cuda.memcpy_htod(self.dev_Ysm,self._Ysm)
-#        self.nsm = len(self._Ysm)
+        #        self.nsm = len(self._Ysm)
+
         
+
+
     def run(self):
         if self.hyper:
             if self.iteration == 0:
@@ -371,7 +385,7 @@ class ABCpmc(object):
 
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nparam)*4 #byte
-                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,self.dev_aux,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
                 
@@ -385,7 +399,7 @@ class ABCpmc(object):
                 
                 self.epsilon=self.epsilon_list[self.iteration]
                 sharedsize=(self._nsample*self._ndata+self._nparam)*4 #byte
-                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+                self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,self.dev_aux,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
                 
