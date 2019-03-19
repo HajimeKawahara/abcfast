@@ -1,14 +1,38 @@
 <img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/logo.png" Titie="explanation" Width=150px>
 
-GPU Approximate Bayesian Computation. Under development.
+GPU Approximate Bayesian Computation. Python and python-wrapped CUDA (using pycuda) code. Under development.
 
-# setting
+# Requirements and Setting
 
-**ABCFAST** uses header files for nvcc. set CPLUS_INCLUDE_PATH to gabc/include.
+## Hardware
+
+- Computer with NVIDIA GPU
+
+Our test environments (GPU/OS) are GTX1070/linux mint19, PASCAL TITAN X /ubuntu18, GeForce TITAN X/linux mint19, GTX 1080Ti/ubuntu18, TESLA V100/ubuntu18. 
+
+## Software
+
+- python3
+- cuda (cuda10 for our tests)
+- pycuda
+- numpy, scipy, matplotlib
+
+**ABCFAST** uses header files (cuda kernels) for nvcc. set CPLUS_INCLUDE_PATH to abcfast/include.
+
+
+For c-chell environment, write
 
 ```
  setenv CPLUS_INCLUDE_PATH abcfast/include
 ```
+
+in .cshrc or .tchrc, so on. For bash environment, write
+
+```
+ CPLUS_INCLUDE_PATH=abcfast/include; export $CPLUS_INCLUDE_PATH
+```
+
+in .bashrc. Perform the **source** command.
 
 # Examples
 
@@ -20,7 +44,7 @@ GPU Approximate Bayesian Computation. Under development.
 
 ABC posterior (histogram) and analytic solutions (solid) for the binomial example (n=10,100, and 1000), using N=10000 particles.
 
-## ABC PMC algorithm
+## ABC-PMC algorithm
 
 - gabcpmc_exp.py the GPU version of ABC PMC algorithm, demonstrating an exponential example in Section 5 of [Turner and Van Zandt (2012) JMP 56, 69](https://www.sciencedirect.com/science/article/abs/pii/S0022249612000272?via%3Dihub), with some modifications.
 
@@ -34,44 +58,72 @@ ABC posteriors for different tolerance thresholds. The summary statistics is s=|
 
 - gabcpmc_sumnorm.py demonstrating a gaussian+gaussian case (Beaumont+09). 
 
-# Customizing ABC-PMC
+## Customizing the ABC-PMC
 
-You need to prepare
+Prepare the following functions:
 
 ### model
 data sampler with given (model) parameters,
 
 **Ysim(NDATA) ~ model( param(NPARAM) )**,
 
-c based or prepared python function
+cuda-based or prepared python function
 
 ### prior
 parameter sample from a prior distribution,
 
 **param(NPARAM) ~ prior()**, 
 
-c based or prepared python function  
+cuda-based or prepared python function  
 
 ### fprior
-a prior density distribution to compute weights, python function
+a prior density distribution to compute weights, python function.
 
 
-# Hierarchical ABC
+## Hierarchical ABC-PMC
 
-- gabcpmc_hibin.py  demonstrating an exponential example in Section 6 of [Turner and Van Zandt (2012) JMP 56, 69](https://www.sciencedirect.com/science/article/abs/pii/S0022249612000272?via%3Dihub). Still super unstable though.
+- gabcpmc_hibin.py  demonstrating an exponential example in Section 6 of [Turner and Van Zandt (2012) JMP 56, 69](https://www.sciencedirect.com/science/article/abs/pii/S0022249612000272?via%3Dihub). Still unstable though.
 
 <img src="https://github.com/HajimeKawahara/gabc/blob/master/documents/fig/hibin.png" Titie="explanation" Width=750px>
 
+The summary statistics is s = Sum (for subject) |mean(X) - mean(Y)|
+
+## Customizing the Hierarchical ABC-PMC
+
+Prepare
+
+### model
+data sampler with given (model) parameters,
+
+**Ysim(NDATA) ~ model( param(NPARAM) )**,
+
+cuda-based or prepared python function
+
+### prior
+parameter sampler from a prior distribution,
+
+**param(NPARAM) ~ prior( hparam(NHPARAM) )**, 
+
+cuda-based or prepared python function  
+
+### hyperprior
+hyperparameter sampler from a hyperprior distribution,
+
+**hparam(NHPARAM) ~ hyperprior()**, 
+
+cuda-based or prepared python function  
 
 
-# Random number generators using curand_kernel.h
+### fhprior
+a hyperprior density distribution to compute weights, python function
+
+## Random number generators using curand_kernel.h
 
 Directory: random_gen
 
-- uniform, normal, 2D normal, gamma distribution, beta distribution, binomial distribution, random choise with discrete probability p_i (the alias method).
-
+- uniform, normal, 2D normal, gamma distribution, beta distribution, binomial distribution, exponential distribution, random choise with discrete probability p_i (the alias method).
 
 # Current Status
 
-This code is in the beta stage (very unstable). Ask [Hajime Kawahara](http://secondearths.sakura.ne.jp/en/index.html) for more details.
+This code is in the beta stage (very unstable). Collaboration with risk sharing or feedback is welcome. Ask [Hajime Kawahara](http://secondearths.sakura.ne.jp/en/index.html) for more details.
 

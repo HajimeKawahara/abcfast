@@ -1,8 +1,4 @@
 import numpy as np
-import pycuda.autoinit
-import pycuda.driver as cuda
-import pycuda.compiler
-from pycuda.compiler import SourceModule
 
 def getptwo(n):
     i=0
