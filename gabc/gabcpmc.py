@@ -9,14 +9,16 @@ import sys
 #self.x, self.xx : sampled hyperparameters for the hierarchical mode
 #
 
-def gabcpmc_module (model,prior,nparam,ndata,nsample,nwparam,footer,nhparam=None,nsubject=None,nss=None,hyperprior=None,maxtryx=10000000):
+def gabcpmc_module (model,prior,nparam,ndata,nsample,nwparam,nreserved,footer,nhparam=None,nsubject=None,nss=None,hyperprior=None,maxtryx=10000000):
     header=\
-    "    #define NPARAM "+str(nparam)+"\n"\
+    "    #define WARP_SIZE 0x1f \n"\
+    +"    #define NPARAM "+str(nparam)+"\n"\
     +"    #define NDATA "+str(ndata)+"\n"\
     +"    #define NSAMPLE "+str(nsample)+"\n"\
     +"    #define PNSAMPLE "+str(getptwo(nsample))+"\n"\
     +"    #define MAXTRYX "+str(maxtryx)+"\n"\
     +"    #define NWPARAM "+str(nwparam)+"\n"\
+    +"    #define NRESERVED "+str(nreserved)+"\n"\
     +"""
     #define CUDART_NAN_F __int_as_float(0x7fffffff)
     #include <stdio.h>
@@ -69,7 +71,7 @@ class ABCpmc(object):
             
         self.maxtryx = 10000000 #MAXTRYX reduce this value when you debug the code.
         self.nthread_use_max = 1024 #MAX NUMBER OF THREADS IN A BLOCK
-
+        
         self._npart = 512  # number of the particles (default=512)
         self._nparam = None    # dimension of parameters in the model
         self._nsample = None # number of the data vector
@@ -78,6 +80,8 @@ class ABCpmc(object):
 
         self.nthread = None #number of threads    
         self.nwparam = None #dimension for weight computing (=nparam for normal, nhparam for hyper)
+        self.ntcommon = 0 #number of thread common value used in the model sampler
+        self.nreserved = None #number of reserved values in shared memory 
         
         self.ess = None # Effective Sample Size
         self.Ecrit = 0.5 # critical ESS/npart for Resampling
@@ -267,8 +271,9 @@ class ABCpmc(object):
                 self.dev_aux = cuda.mem_alloc(self.aux.nbytes)        
                 cuda.memcpy_htod(self.dev_aux,self.aux)
 
+            self.nreserved = self._nsample*self._ndata+self._nparam
                 
-            self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,self.nwparam,footer,maxtryx=self.maxtryx)
+            self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,self.nwparam,self.nreserved,footer,maxtryx=self.maxtryx)
             
             self.pkernel_init=self.source_module.get_function("abcpmc_init")
             self.pkernel=self.source_module.get_function("abcpmc")
@@ -285,6 +290,7 @@ class ABCpmc(object):
 
             if self._nparam == 1:
                 self.onedim=True
+                
             
     def update_hyper_kernel(self):
         #Hierarchical mode
@@ -308,8 +314,11 @@ class ABCpmc(object):
                 sys.exit("Error: Invalid nsubject, nsample pair. nsample/nsubject must be integer (> 0).")                    
             self.nss = nss
             self.nwparam = self._nhparam
+            self.nreserved = self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam
+
+
             self.source_module=gabcpmc_module(self._model,self._prior,self._nparam,self._ndata,self._nsample,\
-                                              self.nwparam,footer,nhparam=self._nhparam, nsubject=self._nsubject,\
+                                              self.nwparam,self.nreserved,footer,nhparam=self._nhparam, nsubject=self._nsubject,\
                                               nss=self.nss,hyperprior=self.hyperprior, maxtryx=self.maxtryx)
             self.pkernel_init=self.source_module.get_function("habcpmc_init")
             self.pkernel=self.source_module.get_function("habcpmc")
@@ -328,7 +337,9 @@ class ABCpmc(object):
 
             if self._nhparam == 1:
                 self.onedim=True
-            
+                
+
+                
     @property
     def Ysm(self):
         return self._Ysm
@@ -345,11 +356,10 @@ class ABCpmc(object):
 
     def run(self):
         if self.hyper:
-            if self.iteration == 0:
+            sharedsize=(self.nreserved+self.ntcommon)*4 #byte
+            self.epsilon=self.epsilon_list[self.iteration]
 
-                self.epsilon=self.epsilon_list[self.iteration]
-                sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
-                
+            if self.iteration == 0:                
                 self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
@@ -361,30 +371,25 @@ class ABCpmc(object):
                 self.iteration = 1
             else:
                 
-                self.epsilon=self.epsilon_list[self.iteration]
-                sharedsize=(self._nsample*self._ndata+self._nhparam+self.nsubject*self._nparam)*4 #byte
                 self.pkernel(self.dev_xx,self.dev_x,self.dev_z,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
                 cuda.memcpy_dtoh(self.z, self.dev_z)
-#                print("x(old)=>",np.sum(self.x))
                 #update covariance
                 self.update_invcov()                
-#                print("invcov=",self.invcov)
-
                 #update weight
                 self.update_weight()
-                #print("weight",self.w)
                 #swap
                 self.dev_x, self.dev_xx = self.dev_xx, self.dev_x
                 self.dev_w, self.dev_ww = self.dev_ww, self.dev_w
                 self.iteration = self.iteration + 1
                 
         else:
+            sharedsize=(self.nreserved+self.ntcommon)*4 #byte
+            self.epsilon=self.epsilon_list[self.iteration]
+
             if self.iteration == 0:
 
-                self.epsilon=self.epsilon_list[self.iteration]
-                sharedsize=(self._nsample*self._ndata+self._nparam)*4 #byte
                 self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,self.dev_aux,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
@@ -397,8 +402,6 @@ class ABCpmc(object):
                 
             else:
                 
-                self.epsilon=self.epsilon_list[self.iteration]
-                sharedsize=(self._nsample*self._ndata+self._nparam)*4 #byte
                 self.pkernel(self.dev_xx,self.dev_x,self.dev_Ysm,np.float32(self.epsilon),self.dev_Ki,self.dev_Li,self.dev_Ui,self.dev_Qmat,np.int32(self.seed),self.dev_dist,self.dev_ntry,self.dev_aux,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_xx)
@@ -466,8 +469,9 @@ class ABCpmc(object):
     def update_weight(self):
         #update weight
         sharedsize=int(self._npart*4) #byte
-        nthread=min(self._npart,self.nthread_use_max)
-        self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, self.dev_invcov, block=(int(nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
+        
+        weight_nthread=min(self._npart,self.nthread_use_max)
+        self.wkernel(self.dev_ww, self.dev_w, self.dev_xx, self.dev_x, self.dev_invcov, block=(int(weight_nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
         cuda.memcpy_dtoh(self.w, self.dev_ww)
 #        print("w=",self.w)
         if self.hyper:

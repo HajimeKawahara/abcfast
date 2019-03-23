@@ -35,7 +35,7 @@ if __name__ == "__main__":
     /* the double normal distribution model generator */
     #include "gennorm.h"
 
-    __device__ float model(float* Ysim, float* param, curandState* s, float* aux){
+    __device__ float model(float* Ysim, float* param, curandState* s, float* aux, int isample){
     
     float cl=curand_uniform(s);
     int i=int(cl*2.0);

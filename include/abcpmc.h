@@ -38,7 +38,7 @@ extern "C"{
     float param[NPARAM];
     float Ysim[NDATA];
     float rn[NPARAM];
-    
+
     curand_init(seed, id, 0, &s);
 
     for ( ; ; ){
@@ -75,15 +75,16 @@ extern "C"{
     }
     __syncthreads();
     /* ===================================================== */
+    
     for (int m=0; m<NPARAM; m++){
       param[m] = cache[NDATA*NSAMPLE+m];
-    }
-
+    } 
+    
     for (int p=0; p<int(float(NSAMPLE-1)/float(nthread))+1; p++){
       isample = p*nthread + ithread;
       if(isample < NSAMPLE){
 	
-	model(Ysim, param, &s, aux);
+	model(Ysim, param, &s, aux, isample);
 	for (int m=0; m<NDATA; m++){
 	  cache[NDATA*isample+m] = Ysim[m];
 	}
