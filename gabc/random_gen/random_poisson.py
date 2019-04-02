@@ -9,7 +9,7 @@ from pycuda.compiler import SourceModule
 
 def gabcrm_module ():
     source_module = SourceModule("""
-    #define NMAXPOI 110
+    #define NMAXPOI 1000
     #include <curand_kernel.h>
 
     extern "C"{
@@ -77,8 +77,6 @@ def gabcrm_module ():
     V = U - pu;
 
     }
-
-
 
     x[id]=-1.0;
     return;
