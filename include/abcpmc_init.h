@@ -110,13 +110,17 @@ extern "C"{
       
       __syncthreads();
 
-
       /* ===================================================== */
       rho = 0.0;
       for (int m=0; m<NDATA; m++){
 	rho += abs(cache[m] - Ysm[m])/NSAMPLE;
       }      
       /* ----------------------------------------------------- */
+
+      /*if(ithread==0){
+	printf("rho=%2.8f Ysm(in)=%2.8f, Ysimsm=%2.8f NSAMPLE=%d \n",rho, Ysm[0], cache[0], NSAMPLE);
+	}*/
+
       
       if(rho<epsilon){
 	

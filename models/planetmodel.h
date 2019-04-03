@@ -1,11 +1,10 @@
 /* #include <math.h> */
-#define PCRIT 0.01
-
+#define PCRIT 0.1
 
 /* unit conversion */
 #define Y2D 365.242189
 #define RSOLAU 0.00464912633
-
+#define REARTHRSOL 0.009164
 
 #define PI 3.141592653589793
 #define SIGMAHK 0.03
@@ -92,24 +91,29 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
   if(threadIdx.x == 0){
     ppick = PCRIT*param[0];
 
-    /* using Gaussian approx */
-    /* Npick=curand_normal(s)*ppick*(1.0-ppick)*Nstars + Nstars*ppick; */
-
-    /* using Poisson approx */
-    Npick = poissonf(ppick*float(Nstars),s);       
+    if( ppick > 0.1 ){
+      /* using Gaussian approx */
+      Npick=curand_normal(s)*ppick*(1.0-ppick)*Nstars + Nstars*ppick; 
+    }else{
+      /* using Poisson approx */
+      Npick = poissonf(ppick*float(Nstars),s);
+    }
     cache[NRESERVED] = Npick;
+    /* printf("lambda=%2.8f Npick=%d \n",ppick*float(Nstars), Npick); */
     
   }
   __syncthreads();
 
   Npick = cache[NRESERVED];
+
+
   
   /* initialization for each thread */
   Ysim[0]=0.0;
-  
-  for (int p=0; p<int(float(Npick-1)/float(gridDim.x))+1; p++){
     
-    if(p*gridDim.x+isample < Npick){
+  for (int p=0; p<int(float(Npick-1)/float(blockDim.x))+1; p++){
+    
+    if(p*blockDim.x+isample < Npick){
       
       /* stellar/lc parameters */
       istar = int(curand_uniform(s)*float(Nstars));
@@ -120,11 +124,9 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
       Tdur = aux[istar + 4*Nstars];
       fduty = aux[istar + 5*Nstars];
 
-      if(threadIdx.x == 0){
+      /*      if(threadIdx.x == 0){
 	printf("istar=%d rstar=%2.8f mstar=%2.8f sigCDPP=%2.8f MESthre=%2.8f Tdur=%2.8f fduty=%2.8f \n",istar,rstar,mstar,sigCDPP,MESthre,Tdur,fduty);
-      } 
-
-
+	} */
       
       /* |cosi| sim U(0,1) but restricted to < pcrit */
       abscosi = curand_uniform(s)*PCRIT;
@@ -133,22 +135,41 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
       Rp = exp(logRpmin + curand_uniform(s)*(logRpmax - logRpmin));
       arsol = pow(P/Y2D,2.0/3.0)/pow(mstar,1.0/3.0)/RSOLAU;
 
+      /*      if(threadIdx.x == 0){
+	printf("abscosi=%2.8f omega=%2.8f P=%2.8f Rp=%2.8f arsol=%2.8f \n",abscosi,omega,P,Rp,arsol);
+	} */
       
       M = Tdur/P;
       Ntrn = M*fduty;
-      k = Rp/rstar;
+      k = Rp*REARTHRSOL/rstar;
+
+      /*      if(threadIdx.x == 0){
+	printf("M=%2.8f Tdur=%2.8f P=%2.8f Ntrn=%2.8f k=%2.8f \n",M,Tdur,P,Ntrn,k);
+	} 
+      */
       
       /* eccentricity according to the Rayleigh distribution */
       rl0 = curand_normal(s);
       rl1 = curand_normal(s);    
       e = min(0.999, SIGMAHK*sqrt(pow(rl0,2)+pow(rl1,2)) );
+
+      /* if(threadIdx.x == 0){
+	printf("e=%2.8f \n",e);
+	} */
       
       Delta = 0.84*(Cld + Sld*k)*pow(k,2);
       
       /* p_det (Gamma distribution) */
-      MES = sqrt(Ntrn)/Delta/sigCDPP;
-      X = MES - 4.1 - (MESthre - 7.1);
+      MES = sqrt(Ntrn)*Delta*1.e6/sigCDPP;
+      X = max(0.0,MES - 4.1 - (MESthre - 7.1));
 
+      /*      if(threadIdx.x == 0){
+	printf("Delta=%2.8f sigCDPP=%2.8f MES=%2.8f X=%2.8f \n",Delta, sigCDPP, MES, X,k );
+	} */
+      
+
+
+      
       /* CDF of the Gamma distribution is P(a, bX) to derive it, see (5.5) in Temme 1994 see comp_gammafac.py for precision */
       bX = Bdet*X;
       pdet = FAC0*exp(-bX)*pow(bX,0) + FAC1*exp(-bX)*pow(bX,1) + 
@@ -162,15 +183,21 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
 	FAC16*exp(-bX)*pow(bX,16) + FAC17*exp(-bX)*pow(bX,17) + 
 	FAC18*exp(-bX)*pow(bX,18) + FAC19*exp(-bX)*pow(bX,19);
       pdet = pdet*pow(bX,Adet);
-
+      
       if(bX > MAXX){
 	pdet = 1.0;
       }
+
       /* p_win */
       onemf = 1.0 - fduty;
       pwin = 1.0 - pow(onemf,M) - M*fduty*pow(onemf,M - 1.0) - 0.5*M*(M-1.0)*pow(fduty,2)*pow(onemf,M-2.0);
+      pwin = max(pwin,0.0);
 
+      /*      if(threadIdx.x == 0){
+	printf("pdet=%2.8f pwin=%2.8f M=%2.8f fduty=%2.8f \n",pdet,pwin,M,fduty);
+	} */
 
+      
       indicator=1.0;
       /* Check detection probability */
       if( pwin*pdet  < curand_uniform(s)){
@@ -178,12 +205,13 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
       }
       
       /* Check transit or not */
-      if ( rstar*(1.0+e*sin(omega)) < arsol*abscosi*(1.0-pow(e,2)))
+      if ( rstar*(1.0+e*sin(omega)) < arsol*abscosi*(1.0-pow(e,2))){
 	indicator = 0.0;
       }
-
+      
       Ysim[0]=Ysim[0]+indicator;
       
+    }
   }
 }
-  
+

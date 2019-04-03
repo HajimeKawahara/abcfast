@@ -1,4 +1,4 @@
-#define NMAXPOI 1000
+#define NMAXPOI 10000
 #include <curand_kernel.h>
 
 __device__ int poissonf(float p, curandState* s){
