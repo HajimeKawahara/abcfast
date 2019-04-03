@@ -26,7 +26,7 @@ if __name__ == "__main__":
     # start ABCpmc 
     abc=ABCpmc()
     abc.maxtryx=1000
-    abc.npart=256
+    abc.npart=512
     abc.wide=2.0
 
     
@@ -71,6 +71,8 @@ if __name__ == "__main__":
     logPmax=np.log(Pmax)
     logRpmin=np.log(Rpmin)
     logRpmax=np.log(Rpmax)
+
+    pchange=0.01458*(nstar/100000)**-0.3333
     
     abc.nparam=1
     abc.ntcommon=1 #use 1 thread common value in shared memory for Npick
@@ -80,6 +82,7 @@ if __name__ == "__main__":
     +"#define logPmax "+str(logPmax)+"\n"\
     +"#define logRpmin "+str(logRpmin)+"\n"\
     +"#define logRpmax "+str(logRpmax)+"\n"\
+    +"#define PCHANGE "+str(pchange)+"\n"\
     +""" 
 
     #include "planetmodel.h"
@@ -124,16 +127,12 @@ if __name__ == "__main__":
     abc.Ysm = np.array([Ysum])
     
     #set prior parameters
-    abc.epsilon_list = np.array([0.01,0.007,0.005,0.003,0.001,0.0005])
+    abc.epsilon_list = np.array([0.007,0.005,0.003,0.001,0.0005])
 
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
     abc.check()
-    
-    plt.hist(abc.x,bins=30,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.show()
-    sys.exit()
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
         abc.run()
