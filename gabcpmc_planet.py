@@ -26,7 +26,7 @@ if __name__ == "__main__":
     # start ABCpmc 
     abc=ABCpmc()
     abc.maxtryx=1000
-    abc.npart=512
+    abc.npart=256
     abc.wide=2.0
 
     
@@ -41,22 +41,24 @@ if __name__ == "__main__":
     Tdur = planet_data["dataspan"].values
     fduty = planet_data["dutycycle"].values
     
-    mask=(sigCDPP==sigCDPP)&(mstar==mstar)&(rstar==rstar)&(mesthre==mesthre)&(Tdur==Tdur)&(fduty==fduty)
+    mask=(sigCDPP==sigCDPP)&(mstar>0.0)&(rstar>0.0)&(mesthre==mesthre)&(Tdur==Tdur)&(fduty==fduty)
 
     #SELECT Main-Sequence
     teff=planet_data["teff"].values
     logg=planet_data["logg"].values
-    mask=(teff<7000.0)&(teff>4000.0)&(logg>4.0)
 
+    mask=mask&(teff<7000.0)&(teff>4000.0)&(logg>4.0)
     
     rstar=rstar[mask]
+    mstar=mstar[mask]
     sigCDPP=sigCDPP[mask]
     mesthre=mesthre[mask]
     Tdur=Tdur[mask]
     fduty=fduty[mask]
     
     nstar=len(rstar)
-    abc.aux=np.concatenate([rstar,sigCDPP,mesthre,Tdur,fduty])
+    
+    abc.aux=np.concatenate([rstar,mstar,sigCDPP,mesthre,Tdur,fduty])
     print("NSTAR=",nstar)
     print("Do not forget to include errors of Rstar in future.")
 
@@ -122,15 +124,20 @@ if __name__ == "__main__":
     abc.Ysm = np.array([Ysum])
     
     #set prior parameters
-    abc.epsilon_list = np.array([30.0,20.0,10.0,5.0])
+    abc.epsilon_list = np.array([10.0])
 
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
     abc.check()
-#    plt.hist(abc.x,bins=30,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    print(abc.dist)
+    print(abc.ntry)
     
-#    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    #    plt.hist(abc.x,bins=30,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    
+    plt.hist(abc.x,bins=20,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.show()
+    sys.exit()
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
         abc.run()

@@ -96,18 +96,13 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
     /* Npick=curand_normal(s)*ppick*(1.0-ppick)*Nstars + Nstars*ppick; */
 
     /* using Poisson approx */
-    Npick = poissonf(ppick*float(Nstars),s);
-       
-    cache[NRESERVED] = Npick;   
+    Npick = poissonf(ppick*float(Nstars),s);       
+    cache[NRESERVED] = Npick;
+    
   }
   __syncthreads();
 
   Npick = cache[NRESERVED];
-
-  /*  if(threadIdx.x == 0){
-    printf("f=%2.8f Npick = %d \n",param[0],Npick);
-    } */
-
   
   /* initialization for each thread */
   Ysim[0]=0.0;
@@ -125,6 +120,12 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
       Tdur = aux[istar + 4*Nstars];
       fduty = aux[istar + 5*Nstars];
 
+      if(threadIdx.x == 0){
+	printf("istar=%d rstar=%2.8f mstar=%2.8f sigCDPP=%2.8f MESthre=%2.8f Tdur=%2.8f fduty=%2.8f \n",istar,rstar,mstar,sigCDPP,MESthre,Tdur,fduty);
+      } 
+
+
+      
       /* |cosi| sim U(0,1) but restricted to < pcrit */
       abscosi = curand_uniform(s)*PCRIT;
       omega = curand_uniform(s)*2.0*PI;

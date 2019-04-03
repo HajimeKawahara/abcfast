@@ -393,7 +393,9 @@ class ABCpmc(object):
                 self.pkernel_init(self.dev_x,self.dev_Ysm,np.float32(self.epsilon),np.int32(self.seed),self.dev_dist,self.dev_ntry,self.dev_aux,block=(int(self.nthread),1,1), grid=(int(self._npart),1),shared=sharedsize)
                 
                 cuda.memcpy_dtoh(self.x, self.dev_x)
-                
+                cuda.memcpy_dtoh(self.dist, self.dev_dist)
+                cuda.memcpy_dtoh(self.ntry, self.dev_ntry)
+
                 #update covariance
                 self.update_invcov()
                 #update weight
