@@ -2,7 +2,7 @@ import pycuda.autoinit
 import pycuda.driver as cuda
 import pycuda.compiler
 from pycuda.compiler import SourceModule
-from gabc.utils.statutils import *
+from abcfast.utils.statutils import *
 import sys
 #Note:
 #self.x, self.xx : sampled parameters for the normal mode

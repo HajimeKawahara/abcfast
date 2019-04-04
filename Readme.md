@@ -17,24 +17,32 @@ Our test environments (GPU/OS) are GTX1070/linux mint19, PASCAL TITAN X /ubuntu1
 - pycuda
 - numpy, scipy, matplotlib
 
+
 **ABCFAST** uses header files (cuda kernels) for nvcc. set CPLUS_INCLUDE_PATH to abcfast/include.
 
 
 For c-chell environment, write
 
 ```
- setenv CPLUS_INCLUDE_PATH abcfast/include
+ setenv CPLUS_INCLUDE_PATH /somewhere/abcfast/include
 ```
 
 in .cshrc or .tchrc, so on. For bash environment, write
 
 ```
- CPLUS_INCLUDE_PATH=abcfast/include; export $CPLUS_INCLUDE_PATH
+ CPLUS_INCLUDE_PATH=/somewhere/abcfast/include; export $CPLUS_INCLUDE_PATH
 ```
 
 in .bashrc. Perform the **source** command.
 
-# Examples
+Also set PYTHONPATH as 
+
+```
+ setenv PYTHONPATH /somewhere/abcfast
+```
+
+
+# examples
 
 ## ABC rejection sampling algorithm
 

@@ -1,0 +1,114 @@
+import time
+import matplotlib.pyplot as plt
+import math
+import numpy as np
+import pycuda.autoinit
+import pycuda.driver as cuda
+import pycuda.compiler
+from pycuda.compiler import SourceModule
+
+def gabcrm_module ():
+    source_module = SourceModule("""
+
+    #include <curand_kernel.h>
+
+    extern "C"{
+    __global__ void uniformgen(float* x, int* vs, float* threshold, const int* values, int b){
+
+    unsigned long seed;
+    unsigned long id;
+    curandState s;
+    
+    seed=10;
+    id = blockIdx.x;
+    ps = curand_init(seed, id, 0, &s);
+
+    float pb = ps * b;
+    int index = __float2int_rd(pb);
+    // fill_uniform sometimes returns 1.0, so we need to check index
+    if (index >= b) {
+    index = 0;
+    }
+    int lr = threshold[index] < pb - index;
+    x[id] = values[index * 2 + lr];
+
+    }
+    }
+
+    extern "C"{
+    __global__ void uniformgen(float *x){
+
+    unsigned long seed;
+    unsigned long id;
+    curandState s;
+    
+    seed=10;
+    id = blockIdx.x;
+    curand_init(seed, id, 0, &s);
+
+    x[id] = curand_uniform(&s);
+
+    }
+    }
+
+    """,options=['-use_fast_math'],no_extern_c=True)
+
+    return source_module
+
+if __name__ == "__main__":
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    print("********************************************")
+    print("Uniform Random Sampler using curand_kernel.h")
+    print("********************************************")
+
+    ################################################3
+    parrs=[0.1,0.2,0.3,0.2,0.1]
+    parr=np.array(parrs, np.float32)
+    parr = parr/np.sum(parr)
+
+    ####
+    threshold = np.ndarray(len(parrs), np.float32)
+    values = np.ndarray(len(parrs) * 2, np.int32)
+    il, ir = 0, 0
+    pairs = list(zip(parr, range(len(parrs))))
+    pairs.sort()
+    for parr, i in pairs:
+        p = parr * len(parrs)
+        while p > 1 and ir < len(threshold):
+            values[ir * 2 + 1] = i
+            p -= 1.0 - threshold[ir]
+            ir += 1
+            threshold[il] = p
+            values[il * 2] = i
+            il += 1
+    # fill the rest
+    for i in range(ir, len(parrs)):
+        values[i * 2 + 1] = 0
+    assert((values < len(threshold)).all())
+    print(values)
+    print(pairs)
+        
+    sys.exit()
+    ################################################3
+
+
+    
+    nw=1
+    nt=10000
+    nq=1
+    nb = nw*nt*nq 
+    sharedsize=0 #byte
+    x=np.zeros(nb)
+    x=x.astype(np.float32)
+    dev_x = cuda.mem_alloc(x.nbytes)
+    cuda.memcpy_htod(dev_x,x)
+
+    source_module=gabcrm_module()
+    pkernel=source_module.get_function("uniformgen")
+    pkernel(dev_x,block=(int(nw),1,1), grid=(int(nt),int(nq)),shared=sharedsize)
+    cuda.memcpy_dtoh(x, dev_x)
+
+    plt.hist(x)
+    plt.show()

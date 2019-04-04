@@ -1,0 +1,21 @@
+    [eigenvalues, eigenvectors] = np.linalg.eig(target_cov)
+    print("V")
+    print(eigenvalues)
+    #    print(eigenvectors)
+    lam1,lam2,e1,e2=eigen_2Dsym(1.0,0.6,0.7)
+    print("V2")
+    print(lam1,lam2)
+
+    #    print(lam1,lam2)
+#    print(np.array([e1,e2]))
+
+    l = np.matrix(np.diag(np.sqrt(eigenvalues)))
+    Q = np.matrix(eigenvectors) * l
+    print(np.matrix(eigenvectors))
+    print(l)
+    
+    print("=========Q===========")
+    print(Q)
+    print("=========Q===========")
+    print(eigenvectors[0,0]*l[0,0])
+    print(e1[0]*np.sqrt(lam1),e2[0]*np.sqrt(lam2))
