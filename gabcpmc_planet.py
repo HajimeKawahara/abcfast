@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # start ABCpmc 
     abc=ABCpmc()
-    abc.maxtryx=2000
+    abc.maxtryx=10000
     abc.npart=256
     abc.wide=2.0
 
@@ -62,16 +62,17 @@ if __name__ == "__main__":
     print("NSTAR=",nstar)
     print("Do not forget to include errors of Rstar in future.")
 
-    Pmin=10.0
-    Pmax=20.0
-    Rpmin=4.0
-    Rpmax=6.0
+    Pmin=256.0
+    Pmax=500.0
+    Rpmin=1.75
+    Rpmax=2.0
     
     logPmin=np.log(Pmin)
     logPmax=np.log(Pmax)
     logRpmin=np.log(Rpmin)
     logRpmax=np.log(Rpmax)
 
+    #switching condition of approx of the binomial distribution (see Binomial.ipynb)
     pchange=0.01458*(nstar/100000)**(-0.3333)
     
     abc.nparam=1
@@ -127,7 +128,11 @@ if __name__ == "__main__":
     abc.Ysm = np.array([Ysum])
     
     #set prior parameters
-    abc.epsilon_list = np.array([0.03,0.02,0.01])
+
+    initep=Ysum*1.e-4
+#    print(initep,Ysum)
+#    sys.exit()
+    abc.epsilon_list = np.array([initep,initep*0.9,initep*0.8])
 
     #initial run of abc pmc
     abc.check_preparation()
@@ -155,5 +160,8 @@ if __name__ == "__main__":
     fig=plt.figure(figsize=(10,5))
     ax=fig.add_subplot(111)
     plt.hist(abc.x,bins=30,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+    plt.title("Rp="+str(Rpmin)+"-"+str(Rpmax)+"Re, P="+str(Pmin)+"-"+str(Pmax)+"d")
+    plt.xlabel("$f_{r,p}$")
+    plt.ylabel("freqeuncy")
     plt.show()
 
