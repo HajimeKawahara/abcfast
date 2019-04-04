@@ -25,8 +25,8 @@ if __name__ == "__main__":
 
     # start ABCpmc 
     abc=ABCpmc()
-    abc.maxtryx=1000
-    abc.npart=512
+    abc.maxtryx=2000
+    abc.npart=256
     abc.wide=2.0
 
     
@@ -64,15 +64,15 @@ if __name__ == "__main__":
 
     Pmin=10.0
     Pmax=20.0
-    Rpmin=1.0
-    Rpmax=1.25
+    Rpmin=4.0
+    Rpmax=6.0
     
     logPmin=np.log(Pmin)
     logPmax=np.log(Pmax)
     logRpmin=np.log(Rpmin)
     logRpmax=np.log(Rpmax)
 
-    pchange=0.01458*(nstar/100000)**-0.3333
+    pchange=0.01458*(nstar/100000)**(-0.3333)
     
     abc.nparam=1
     abc.ntcommon=1 #use 1 thread common value in shared memory for Npick
@@ -127,17 +127,27 @@ if __name__ == "__main__":
     abc.Ysm = np.array([Ysum])
     
     #set prior parameters
-    abc.epsilon_list = np.array([0.007,0.005,0.003,0.001,0.0005])
+    abc.epsilon_list = np.array([0.03,0.02,0.01])
 
     #initial run of abc pmc
     abc.check_preparation()
     abc.run()
     abc.check()
+
+#    print(abc.dist)
+#    print(abc.ntry)
+#    print(abc.x)
+    
+#    fig=plt.figure(figsize=(10,5))
+#    ax=fig.add_subplot(111)
+#    plt.hist(abc.x,bins=300,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+#    plt.show()
+#    sys.exit()
     #pmc sequence
     for eps in abc.epsilon_list[1:]:
         abc.run()
         abc.check()
-
+        print("Mean distance=",np.mean(abc.dist))
     tend = time.time()
 
     print(tend-tstart,"sec")

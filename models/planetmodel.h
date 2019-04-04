@@ -1,5 +1,5 @@
 /* #include <math.h> */
-#define PCRIT 0.01
+#define PCRIT 0.1
 /* unit conversion */
 #define Y2D 365.242189
 #define RSOLAU 0.00464912633
@@ -89,16 +89,19 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
   /* see ipynb Bonomial... */
   if(threadIdx.x == 0){
     ppick = PCRIT*param[0];
-
+    /*    Npick=curand_normal(s)*sqrt(ppick*(1.0-ppick)*Nstars) + Nstars*ppick; */
     if( ppick > PCHANGE ){
       /* using Gaussian approx */
-      Npick=curand_normal(s)*ppick*(1.0-ppick)*Nstars + Nstars*ppick; 
+      Npick=curand_normal(s)*sqrt(ppick*(1.0-ppick)*Nstars) + Nstars*ppick; 
+
     }else{
       /* using Poisson approx */
       Npick=poissonf(ppick*float(Nstars),s);
+
     }
+
+    
     cache[NRESERVED] = Npick;
-    /* printf("lambda=%2.8f Npick=%d \n",ppick*float(Nstars), Npick); */
     
   }
   __syncthreads();
