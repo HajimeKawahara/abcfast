@@ -4,6 +4,7 @@ import pycuda.compiler
 from pycuda.compiler import SourceModule
 from abcfast.utils.statutils import *
 import sys
+
 #Note:
 #self.x, self.xx : sampled parameters for the normal mode
 #self.x, self.xx : sampled hyperparameters for the hierarchical mode

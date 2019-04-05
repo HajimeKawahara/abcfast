@@ -1,5 +1,4 @@
 /* #include <math.h> */
-#define PCRIT 0.1
 /* unit conversion */
 #define Y2D 365.242189
 #define RSOLAU 0.00464912633
@@ -15,6 +14,7 @@
 #define Adet 4.65
 #define Bdet 0.98 
 
+/* these factors are used for the Gamma distribution */
 #define FAC0 0.014970127150014402
 #define FAC1 0.002649580026551221
 #define FAC2 0.00039843308669943166
@@ -99,8 +99,10 @@ __device__ void model(float* Ysim, float* param, curandState* s, float* aux, int
       Npick=poissonf(ppick*float(Nstars),s);
 
     }
-
-    
+    /* avoiding negative f */
+    if(param[0]<0.0){
+      Npick=0;
+    }
     cache[NRESERVED] = Npick;
     
   }
