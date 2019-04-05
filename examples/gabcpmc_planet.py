@@ -159,14 +159,34 @@ def ABCfrp(Pmin=256.0,Pmax=500.0,Rpmin=1.75,Rpmax=2.0):
 
     print(tend-tstart,"sec")
 
-    fig=plt.figure(figsize=(10,5))
-    ax=fig.add_subplot(111)
-    plt.hist(abc.x,bins=30,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
-    plt.title("Rp="+str(Rpmin)+"-"+str(Rpmax)+"Re, P="+str(Pmin)+"-"+str(Pmax)+"d")
-    plt.xlabel("$f_{r,p}$")
-    plt.ylabel("freqeuncy")
-    plt.show()
-
-if __name__ == "__main__":
+    if True:
+        fig=plt.figure(figsize=(10,5))
+        ax=fig.add_subplot(111)
+        plt.hist(abc.x,bins=30,label="$\epsilon$="+str(abc.epsilon),density=True,alpha=0.5)
+        plt.title("Rp="+str(Rpmin)+"-"+str(Rpmax)+"Re, P="+str(Pmin)+"-"+str(Pmax)+"d")
+        plt.xlabel("$f_{r,p}$")
+        plt.ylabel("freqeuncy")
+        plt.savefig("frp"+str(Rpmin)+"-"+str(Rpmax)+"_"+str(Pmin)+"-"+str(Pmax)+".png")
     
-    ABCfrp(Pmin=32.0,Pmax=64.0,Rpmin=1.75,Rpmax=2.0)
+    return abc.x
+        
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description='compute frp')
+    parser.add_argument('-p', nargs=2, help='Pmin, Pmax', type=float)
+    parser.add_argument('-r', nargs=2, help='Rpmin, Rpmax', type=float)
+
+    args = parser.parse_args()
+    Pmin=args.p[0]
+    Pmax=args.p[1]
+    Rpmin=args.r[0]
+    Rpmax=args.r[1]
+    
+    frp=ABCfrp(Pmin=Pmin,Pmax=Pmax,Rpmin=Rpmin,Rpmax=Rpmax)
+    frpmed=np.median(frp)
+    frpmin=np.percentile(frp,15.87)
+    frpmax=np.percentile(frp,84.13)
+
+    f = open('frp.txt','a')
+    f.write(str(Rpmin)+","+str(Rpmax)+","+str(Pmin)+","+str(Pmax)+","+str(frpmed)+","+str(frpmin)+","+str(frpmax)+'\n')
+    f.close()
