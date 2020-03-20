@@ -49,13 +49,14 @@ if __name__ == "__main__":
     plt.hist(x,bins=30,label="n="+str(n),density=True,alpha=0.5)
     plt.axvline(ptrue,color="gray",label="True",ls="dashed")
     plt.xlim(0,1)
-    plt.xlabel("p")
+    plt.xlabel("p",fontsize=16)
     alpha=1.0
     beta=1.0
     
     xl = np.linspace(betafunc.ppf(0.0001, Yobs+alpha, n - Yobs + beta),betafunc.ppf(0.9999,Yobs+alpha, n - Yobs + beta), 100)
     plt.plot(xl, betafunc.pdf(xl, Yobs+alpha, n - Yobs + beta),label="analytic", color="green")
-    plt.legend()
-
-    plt.savefig("abcrm"+str(n)+".png")
+    plt.legend(fontsize=14)
+    plt.tick_params(labelsize=14)
+    plt.title("Observed = "+str(Yobs),fontsize=14)
+    plt.savefig("abcrm"+str(n)+".pdf", bbox_inches="tight", pad_inches=0.0)
     plt.show()
